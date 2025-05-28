@@ -2,7 +2,8 @@ from PIL.Image import Image
 from rpi.models import IOled
 import Adafruit_SSD1306, logging, time
 
-_DISP = Adafruit_SSD1306.SSD1306_128_64(rst=None)
+_DISP = Adafruit_SSD1306.SSD1306_128_64(rst=None, i2c_address=0x3c)
+_DISP.begin()
 _LOGGER = logging.getLogger('Oled')
 
 class Oled(IOled):

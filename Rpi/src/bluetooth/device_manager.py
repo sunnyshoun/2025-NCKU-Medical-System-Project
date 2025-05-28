@@ -164,9 +164,10 @@ def connect_device(device: Device) -> bool:
                 return False
             
             hfp_profile = next(
-                (p for p in card.profile_list if any(term in p.name.lower() for term in ["headset", "handsfree"])),
+                (p for p in card.profile_list if any(term in p.name.lower() and "cvsd" not in p.name.lower() for term in ["headset", "handsfree"])),
                 None
             )
+            
             if not hfp_profile:
                 return False
             

@@ -89,7 +89,12 @@ class MainMenu(MenuBase):
         self.navigation_timer = None
         self.oled_lock = threading.Lock()
         default_device = Device('default', get_config_value('HEADPHONE_DEVICE_MAC') or 'none')
-        _LOGGER.info(f'Connect to default device: {self.bluetooth.connect_bt_device(default_device)}')
+        
+        connect_result = self.bluetooth.connect_bt_device(default_device)
+        if connect_result:
+            self.bt_device = default_device
+        
+        _LOGGER.info(f'Connect to default device: {connect_result}')
         self.refresh_bluetooth()
 
     def start_bluetooth_update(self):
