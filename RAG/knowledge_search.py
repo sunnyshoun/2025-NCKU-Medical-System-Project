@@ -1,6 +1,9 @@
-import requests
-import json
+import os
+import re
 import uuid
+import json
+import requests
+from dotenv import load_dotenv
 from datetime import datetime
 from typing import List, Dict
 from urllib3.util.retry import Retry
@@ -8,10 +11,10 @@ from requests.adapters import HTTPAdapter
 from ckip_transformers.nlp import CkipWordSegmenter
 from transformers import pipeline
 from sentence_transformers import SentenceTransformer
-import re
 
-# xAI API 設定（請替換為實際的 API Key）
-XAI_API_KEY = "API_KEY"
+load_dotenv()
+
+XAI_API_KEY = os.getenv('XAI_API_KEY')
 XAI_API_ENDPOINT = "https://api.x.ai/v1/search"  # 使用即時搜索端點
 
 # 可靠來源的域名清單
