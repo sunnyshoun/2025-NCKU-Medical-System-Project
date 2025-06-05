@@ -15,7 +15,7 @@ from sentence_transformers import SentenceTransformer
 load_dotenv()
 
 XAI_API_KEY = os.getenv('XAI_API_KEY')
-XAI_API_ENDPOINT = "https://api.x.ai/v1/search"  # 使用即時搜索端點
+XAI_API_ENDPOINT = "https://api.x.ai/v1/chat/completions"  # 使用即時搜索端點
 
 # 可靠來源的域名清單
 TRUSTED_DOMAINS = [
