@@ -15,7 +15,7 @@ from sentence_transformers import SentenceTransformer
 load_dotenv()
 
 XAI_API_KEY = os.getenv('XAI_API_KEY')
-XAI_API_ENDPOINT = "https://api.x.ai/v1/search"  # 使用即時搜索端點
+XAI_API_ENDPOINT = "https://api.x.ai/v1/chat/completions"  # 使用即時搜索端點
 
 # 可靠來源的域名清單
 TRUSTED_DOMAINS = [
@@ -68,26 +68,39 @@ def search_xai_api(query: str, lang: str = "zh") -> List[Dict]:
         "Authorization": f"Bearer {XAI_API_KEY}",
         "Content-Type": "application/json"
     }
+    # 根據語言調整查詢提示
+    content = f"以{lang}回答：{query}" if lang == "zh" else query
     payload = {
-        "query": query,
-        "max_results": 20,
-        "lang": lang,
-        "filter": {
+        "messages": [
+            {
+                "role": "user",
+                "content": content
+            }
+        ],
+        "search_parameters": {
+            "mode": "auto",
             "domains": TRUSTED_DOMAINS,
             "exclude_ads": True,
             "require_secure": True
-        }
+        },
+        "model": "grok-3-latest",
+        "max_tokens": 2000
     }
     try:
         response = session.post(XAI_API_ENDPOINT, headers=headers, json=payload, timeout=10)
         response.raise_for_status()
         data = response.json()
-        return [
-            item for item in data.get("results", [])
-            if "source" in item and item["source"].startswith(('http://', 'https://'))
-        ]
+        # 檢查回應結構
+        if "choices" in data and data["choices"]:
+            content = data["choices"][0].get("message", {}).get("content", "")
+            return [{"content": content, "source": "xAI API", "relevance": 1.0, "title": query}]
+        else:
+            print(f"無有效回應: {query}")
+            return []
     except requests.exceptions.RequestException as e:
         print(f"查詢失敗: {query}, 錯誤: {e}")
+        if response:
+            print(f"錯誤詳情: {response.text}")
         return []
 
 # 提取知識重點
