@@ -1,9 +1,9 @@
 from pydantic import BaseModel
-from typing import List
+from typing import Optional
 
 class SearchRequest(BaseModel):
     query: str
-    top_k: int = 5
+    top_k: Optional[int] = 5
 
 class SearchResponse(BaseModel):
     rank: int

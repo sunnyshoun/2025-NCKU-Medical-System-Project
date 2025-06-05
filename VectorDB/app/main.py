@@ -8,5 +8,5 @@ app = FastAPI(title="VectorDB Search API", description="A FastAPI service for ve
 
 @app.post("/search", response_model=List[SearchResponse])
 async def search_endpoint(request: SearchRequest, vector_db=Depends(get_vector_db)):
-    results = search(query_text=request.query, top_k=request.top_k, model=vector_db["model"], index=vector_db["index"], index_to_id=vector_db["index_to_id"])
+    results = search(query_text=request.query, top_k=request.top_k, vector_db=vector_db)
     return results

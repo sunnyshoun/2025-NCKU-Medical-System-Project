@@ -51,19 +51,60 @@ VectorDB/
    uvicorn app.main:app --host 0.0.0.0 --port 8000
    ```
 
-## 與 Spring 後端整合
-- Spring 後端通過 POST 請求呼叫 `/search` 端點：
-  ```bash
-  curl -X POST "http://localhost:8000/search" -H "Content-Type: application/json" -d '{"query": "SMILE雷射手術全名是什麼?", "top_k": 5}'
+## 呼叫 API (REST)
+
+### 端點：搜尋知識點
+- **方法**：`POST`
+- **URL**：`http://localhost:8000/search`
+- **說明**：根據輸入的查詢問題生成嵌入向量，檢索眼科知識庫中最相關的知識點，並返回知識點 ID 與相似度分數。
+
+#### Request
+- **Content-Type**：`application/json`
+- **Request Body**：
+  ```json
+  {
+    "query": "string",
+    "top_k": "integer"
+  }
   ```
-- 回應格式：
+  - **query**：查詢問題的文字內容，例如 "SMILE雷射手術全名是什麼?"
+  - **top_k**：返回的相關知識點數量，預設為 5。
+
+#### 範例請求
+```bash
+curl -X POST "http://localhost:8000/search" \
+     -H "Content-Type: application/json" \
+     -d '{"query": "SMILE雷射手術全名是什麼?", "top_k": 5}'
+```
+
+#### Response
+- **Status Code**：`200 OK`
+- **Content-Type**：`application/json`
+- **Response Body**：
   ```json
   [
-    {"rank": 1, "id": "uuid", "similarity": 0.95},
-    {"rank": 2, "id": "uuid", "similarity": 0.92},
+    {
+      "rank": "integer",
+      "id": "string",
+      "similarity": "float"
+    },
     ...
   ]
   ```
+  - **rank**：結果的排名，從 1 開始。
+  - **id**：知識點的唯一識別碼（UUID）。
+  - **similarity**：查詢與知識點的相似度分數，範圍為 0 到 1。
+
+#### 範例回應
+```json
+[
+  {"rank": 1, "id": "uuid-1234", "similarity": 0.95},
+  {"rank": 2, "id": "uuid-5678", "similarity": 0.92},
+  {"rank": 3, "id": "uuid-9012", "similarity": 0.88},
+  {"rank": 4, "id": "uuid-3456", "similarity": 0.85},
+  {"rank": 5, "id": "uuid-7890", "similarity": 0.82}
+]
+```
 
 ## 注意事項
 - 確保 FAISS 索引與 `scripts/vector_embedding.py` 生成的格式一致。
