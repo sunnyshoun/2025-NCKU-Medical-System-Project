@@ -11,7 +11,7 @@ from sentence_transformers import SentenceTransformer
 import re
 
 # xAI API 設定（請替換為實際的 API Key）
-XAI_API_KEY = "xai-ADBHbTMDadxUU6Ds01wsRrqO0thtNyWiIZZPXB7ZZZsuP1SZZsq75HjVNpc2GaBytjg6wCA7qRnyeJsN"
+XAI_API_KEY = "API_KEY"
 XAI_API_ENDPOINT = "https://api.x.ai/v1/search"  # 使用即時搜索端點
 
 # 可靠來源的域名清單
