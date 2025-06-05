@@ -3,6 +3,7 @@ import re
 import uuid
 import json
 import requests
+import time
 from dotenv import load_dotenv
 from datetime import datetime
 from typing import List, Dict
@@ -15,46 +16,36 @@ from sentence_transformers import SentenceTransformer
 load_dotenv()
 
 XAI_API_KEY = os.getenv('XAI_API_KEY')
-XAI_API_ENDPOINT = "https://api.x.ai/v1/chat/completions"  # 使用即時搜索端點
+XAI_API_ENDPOINT = "https://api.x.ai/v1/chat/completions"
 
-# 可靠來源的域名清單
+# 台灣高公信力醫療網站（最多 5 個）
 TRUSTED_DOMAINS = [
-    "zeiss.com", "zeiss.com.tw", "aao.org", "nih.gov", "who.int",
-    "ncbi.nlm.nih.gov", "medlineplus.gov", "nobeleye.com.tw",
-    "health.gov.tw", "bmjopen.bmj.com", "biomedcentral.com"
+    "health.gov.tw",      # 衛生福利部
+    "ntuh.gov.tw",        # 國立台灣大學醫學院附設醫院
+    "vghtpe.gov.tw",      # 台北榮民總醫院
+    "cgh.org.tw",         # 長庚紀念醫院
+    "nobeleye.com.tw"     # 諾貝爾眼科
 ]
 
-# 擴展的搜尋關鍵字（中文和英文，涵蓋更多眼睛相關醫學知識）
+# 僅保留中文搜尋關鍵字
 SEARCH_QUERIES = [
-    # 中文
-    "視力檢測方法", "眼睛健康與保健", "近視", "遠視", "散光", 
+    "視力檢測方法", "眼睛健康與保健", "近視", "遠視", "散光",
     "青光眼", "白內障", "視力檢查標準", "家庭視力篩檢", "視力相關生活品質",
-    "老花眼", "視網膜病變", "角膜炎", "乾眼症", "眼壓", 
-    "視神經損傷", "色盲", "夜盲症", "飛蚊症", "眼瞼炎", 
-    "結膜炎", "角膜移植", "視網膜剝離", "糖尿病視網膜病變", "黃斑部病變",
-    # 英文
-    "vision screening methods", "eye health and care", "myopia", "hyperopia", "astigmatism",
-    "glaucoma", "cataract", "vision testing standards", "home-based vision screening", 
-    "vision-related quality of life", "presbyopia", "retinal disorders", "keratitis", 
-    "dry eye syndrome", "intraocular pressure", "optic nerve damage", "color blindness", 
-    "night blindness", "floaters", "blepharitis", "conjunctivitis", "corneal transplant", 
-    "retinal detachment", "diabetic retinopathy", "macular degeneration"
+    "老花眼", "視網膜病變", "角膜炎", "乾眼症", "眼壓",
+    "視神經損傷", "色盲", "夜盲症", "飛蚊症", "眼瞼炎",
+    "結膜炎", "角膜移植", "視網膜剝離", "糖尿病視網膜病變", "黃斑部病變"
 ]
 
 # 初始化 NLP 工具
-summarizer = pipeline("summarization", model="t5-small")  # 摘要工具
-ws_driver = CkipWordSegmenter(model="bert-base", device=0)  # CKIP 分詞器
-embedder = SentenceTransformer('distilbert-base-nli-stsb-mean-tokens')  # 向量嵌入
+summarizer = pipeline("summarization", model="t5-small")
+ws_driver = CkipWordSegmenter(model="bert-base", device=0)
+embedder = SentenceTransformer('distilbert-base-nli-stsb-mean-tokens')
 
 # 資料清洗函數
 def clean_content(content: str) -> str:
-    # 移除 HTML 標籤
     content = re.sub(r'<[^>]+>', '', content)
-    # 移除多餘空白和換行
     content = re.sub(r'\s+', ' ', content).strip()
-    # 移除無意義字符（如特殊符號、過多的標點）
     content = re.sub(r'[^\w\s,.!?]', '', content)
-    # 移除過短或無意義的內容
     if len(content) < 20 or content.lower() in ['not found', 'error', '']:
         return None
     return content
@@ -68,8 +59,7 @@ def search_xai_api(query: str, lang: str = "zh") -> List[Dict]:
         "Authorization": f"Bearer {XAI_API_KEY}",
         "Content-Type": "application/json"
     }
-    # 根據語言調整查詢提示
-    content = f"以{lang}回答：{query}" if lang == "zh" else query
+    content = f"請根據關鍵字 '{query}' 查詢網站內相關的知識，並以中文回答"
     payload = {
         "messages": [
             {
@@ -79,9 +69,9 @@ def search_xai_api(query: str, lang: str = "zh") -> List[Dict]:
         ],
         "search_parameters": {
             "mode": "auto",
-            "domains": TRUSTED_DOMAINS,
-            "exclude_ads": True,
-            "require_secure": True
+            "sources": [
+                {"type": "web", "allowed_websites": TRUSTED_DOMAINS}
+            ]
         },
         "model": "grok-3-latest",
         "max_tokens": 2000
@@ -90,16 +80,19 @@ def search_xai_api(query: str, lang: str = "zh") -> List[Dict]:
         response = session.post(XAI_API_ENDPOINT, headers=headers, json=payload, timeout=10)
         response.raise_for_status()
         data = response.json()
-        # 檢查回應結構
+        print(f"API 回應: {data}")
         if "choices" in data and data["choices"]:
             content = data["choices"][0].get("message", {}).get("content", "")
-            return [{"content": content, "source": "xAI API", "relevance": 1.0, "title": query}]
+            # 檢查是否使用外部來源
+            sources_used = data.get("usage", {}).get("num_sources_used", 0)
+            print(f"使用外部來源數量: {sources_used}")
+            return [{"content": content, "source": "xAI API", "relevance": 1.0, "title": query}] if content else []
         else:
             print(f"無有效回應: {query}")
             return []
     except requests.exceptions.RequestException as e:
         print(f"查詢失敗: {query}, 錯誤: {e}")
-        if response:
+        if 'response' in locals():
             print(f"錯誤詳情: {response.text}")
         return []
 
@@ -109,7 +102,10 @@ def extract_knowledge_points(content: str, max_length: int = 100) -> List[str]:
     if not cleaned_content:
         return []
     try:
-        summary = summarizer(cleaned_content, max_length=max_length, min_length=50, do_sample=False)
+        # 動態調整 max_length，避免輸入長度過短警告
+        input_length = len(cleaned_content.split())
+        adjusted_max_length = min(max_length, max(50, input_length // 2))
+        summary = summarizer(cleaned_content, max_length=adjusted_max_length, min_length=30, do_sample=False)
         return [summary[0]["summary_text"]]
     except Exception as e:
         print(f"摘要提取失敗: {e}")
@@ -120,23 +116,21 @@ def generate_tags(query: str, content: str) -> List[str]:
     cleaned_content = clean_content(content)
     if not cleaned_content:
         return query.split()[:5]
-    # 使用 CKIP 分詞
-    ws_result = ws_driver([cleaned_content])[0]  # CKIP 返回分詞結果
-    # 過濾停用詞並提取關鍵詞（簡單模擬關鍵詞提取）
+    ws_result = ws_driver([cleaned_content])[0]
     stopwords = {'的', '是', '在', '了', '和', '與', '及', '或', '等'}
     keywords = [word for word in ws_result if word not in stopwords and len(word) > 1]
-    # 結合查詢關鍵字和提取的關鍵詞，去重
     combined = list(set(keywords + query.split()))
-    return combined[:5]  # 限制最多 5 個標籤
+    return combined[:5]
 
 # 儲存知識點的列表
 knowledge_points: List[Dict] = []
 
 # 執行搜尋並整理知識點
 for query in SEARCH_QUERIES:
+    input("按任意鍵繼續查詢...")
     print(f"正在查詢: {query}")
-    lang = "zh" if any(c in query for c in "中文") else "en"
-    search_results = search_xai_api(query, lang)
+    search_results = search_xai_api(query, lang="zh")
+    time.sleep(1)  # 每次請求間隔 1 秒，避免速率限制
     
     for item in search_results:
         content = item.get("content", "")
@@ -161,7 +155,7 @@ for query in SEARCH_QUERIES:
                 "knowledge_points": point,
                 "tags": generate_tags(query, point),
                 "source": source,
-                "language": lang,
+                "language": "zh",
                 "timestamp": datetime.now().isoformat(),
                 "relevance_score": item.get("relevance", 0.0),
                 "category": query,
