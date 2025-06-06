@@ -1,5 +1,4 @@
 import json
-import os
 import faiss
 import numpy as np
 from sentence_transformers import SentenceTransformer
@@ -37,12 +36,14 @@ print(f"成功載入 {len(data)} 筆資料。")
 texts_to_embed = []
 original_ids = []
 for item in data:
-    combined_text = f"{item.get('knowledge_points', '')} {item.get('summary', '')}".strip()
-    if combined_text:
+    knowledge_point = item.get('knowledge_point', '')
+    tags = item.get('tags', '')
+    if knowledge_point and tags:
+        combined_text = f"{knowledge_point} tags:[{', '.join(tags)}]".strip()
         texts_to_embed.append(combined_text)
         original_ids.append(item['id'])
     else:
-        print(f"警告: ID {item.get('id')} 的 knowledge_points 或 summary 為空，已跳過。")
+        print(f"警告: ID {item.get('id')} 的 knowledge_points 或 tags 為空，已跳過。")
 
 if not texts_to_embed:
     print("錯誤: 沒有可供 embedding 的有效文本資料。")

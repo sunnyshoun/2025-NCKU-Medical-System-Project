@@ -31,7 +31,9 @@ TRUSTED_DOMAINS = [
     "www.mayoclinic.org",
     "www.nei.nih.gov",
     "www.hopkinsmedicine.org",
-    "www.webmd.com"
+    "www.webmd.com",
+    "www.eyecareamerica.org",
+    "www.arvo.org"
 ]
 
 # 要搜尋的中文關鍵字列表
@@ -124,21 +126,21 @@ def fetch_knowledge_from_ai(query: str) -> List[Dict]:
 [{', '.join(TRUSTED_DOMAINS)}]
 
 請將搜尋到的重要知識點，整理成一個 JSON 陣列，陣列中會儲存多筆知識點，每個知識點都必須包含以下欄位：
-1.  "knowledge_points": 一段不超過 150 字的重要醫療知識內容，內容要以正規醫療知識或是衛教資訊為主。
-2.  "summary": 比 knowledge_points 更簡短的核心摘要。
+1.  "knowledge_point": 一段不超過 150 字的重要醫療知識內容，內容要以正規醫療知識或是衛教資訊為主。
+2.  "summary": 比 knowledge_point 更簡短的核心摘要。
 3.  "tags": 一個包含最多 5 個與主題高度相關的中文或英文術語標籤的陣列。
 4.  "source": 提供該知識點的具體來源 URL，該 URL 必須來自上述的信任網站清單，且應指向最相關的子頁面，若無子頁面則使用涵蓋該主題的通用頁面。
 
 範例格式如下，注意這只是範例，僅供參考json格式，內容須由搜尋統整後得出：
 [
     {{
-        "knowledge_points": "知識1的內容",
+        "knowledge_point": "知識1的內容",
         "summary": "對知識點的簡單摘要",
         "tags": ["tag1", "tag2", "tag3", ...],
         "source": "https://xxx.xxx.xxx.xxx"
     }},
     {{
-        "knowledge_points": "知識2的內容",
+        "knowledge_point": "知識2的內容",
         "summary": "對知識點的簡單摘要",
         "tags": ["tag1", "tag2", "tag3", ...],
         "source": "https://xxx.xxx.xxx.xxx"
