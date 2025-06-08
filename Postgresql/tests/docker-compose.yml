@@ -1,0 +1,20 @@
+services:
+  postgres:
+    container_name: pg-server
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: mysecretpassword
+    volumes:
+      - ./backups:/backups
+      - ../config/postgresql.conf:/etc/postgresql/postgresql.conf
+      - ../init:/docker-entrypoint-initdb.d/
+      - ./testfiles:/testfiles
+    entrypoint: ["/bin/bash", "/docker-entrypoint-initdb.d/pg-entrypoint.sh"]
+    networks:
+      - net
+
+networks:
+  net:
+    driver: bridge
