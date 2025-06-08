@@ -11,7 +11,7 @@ services:
       - ../config/postgresql.conf:/etc/postgresql/postgresql.conf
       - ../init:/docker-entrypoint-initdb.d/
       - ./testfiles:/testfiles
-    entrypoint: ["/docker-entrypoint-initdb.d/pg-entrypoint.sh"]
+    entrypoint: ["/bin/bash", "/docker-entrypoint-initdb.d/pg-entrypoint.sh"]
     networks:
       - net
 
