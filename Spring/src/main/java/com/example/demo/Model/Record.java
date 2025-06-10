@@ -17,7 +17,7 @@ public class Record {
     @Column(name = "user_id", nullable = false)
     private UUID userId;
 
-    @Column(name = "corr_l", columnDefinition = "TEXT", nullable = true) // text NULLABLE
+    @Column(name = "corr_l", columnDefinition = "TEXT", nullable = true)
     private String corrL; // 左眼矯正視力
 
     @Column(name = "diopter_l", columnDefinition = "TEXT", nullable = true)
@@ -53,9 +53,6 @@ public class Record {
         this.uncoL = uncoL;
         this.uncoR = uncoR;
     }
-
-
-
 
     public Long getRecordId() {
         return recordId;
