@@ -1,0 +1,24 @@
+server:
+  error:
+    include-message: always
+    include-binding-errors: always
+
+spring:
+  datasource:
+    password: frank08270110
+    url: jdbc:postgresql://localhost:5432/registration
+    username: postgres
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect 
+        format_sql: true
+    show-sql: true
+
+#logging: #debug
+ # level:
+  #  org.springframework: DEBUG
+   # org.hibernate: DEBUG
+    #com.example.demo: DEBUG
