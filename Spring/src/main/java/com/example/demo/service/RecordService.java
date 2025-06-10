@@ -1,7 +1,8 @@
 package com.example.demo.service;
 
 import com.example.demo.model.Record;
-import com.example.demo.model.RecordRepository;
+import com.example.demo.repository.RecordRepository;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
