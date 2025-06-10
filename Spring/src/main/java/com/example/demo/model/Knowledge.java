@@ -6,6 +6,7 @@ import jakarta.persistence.*;
 @Entity
 public class Knowledge {
 
+    @Id
     @Column(name = "knowledge_id", nullable = false)
     private String knowledgeId;
 
