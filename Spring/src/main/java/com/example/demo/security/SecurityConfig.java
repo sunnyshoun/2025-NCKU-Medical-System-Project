@@ -1,4 +1,4 @@
-package com.example.demo.Security;
+package com.example.demo.security;
 
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -20,8 +20,8 @@ import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
-import com.example.demo.Model.MyAppUserService;
-import com.example.demo.Filter.JwtAuthFilter;
+import com.example.demo.model.MyAppUserService;
+import com.example.demo.filter.JwtAuthFilter;
 
 import lombok.AllArgsConstructor;
 
