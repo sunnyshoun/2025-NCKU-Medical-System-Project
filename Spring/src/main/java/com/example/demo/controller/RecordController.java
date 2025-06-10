@@ -13,6 +13,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import jakarta.validation.Valid;
+
 import java.util.List;
 import java.util.UUID;
 
@@ -42,8 +44,7 @@ public class RecordController {
      * @return ResponseEntity<Record> 回傳新增後的Record
      */
     @PostMapping("/records") //新增POST API
-    public ResponseEntity<Record> createRecord(@RequestBody Record record,
-                                                @AuthenticationPrincipal MyAppUser currentUser) {
+    public ResponseEntity<Record> createRecord(@Valid @RequestBody Record record, @AuthenticationPrincipal MyAppUser currentUser) {
         if (currentUser == null) {
             return new ResponseEntity<>(HttpStatus.UNAUTHORIZED);
         }

@@ -1,7 +1,7 @@
 package com.example.demo.filter;
 
 import com.example.demo.model.MyAppUser;
-import com.example.demo.model.MyAppUserRepository;
+import com.example.demo.repository.MyAppUserRepository;
 import com.example.demo.utils.JwtTokenUtil;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
