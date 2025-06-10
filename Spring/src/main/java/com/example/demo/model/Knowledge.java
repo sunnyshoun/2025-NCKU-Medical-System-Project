@@ -2,7 +2,7 @@ package com.example.demo.model;
 
 import jakarta.persistence.*;
 
-@Table(name = "knowledges") // records表
+@Table(name = "knowledges") // knowledges表
 @Entity
 public class Knowledge {
 
