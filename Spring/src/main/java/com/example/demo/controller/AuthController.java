@@ -59,7 +59,7 @@ public class AuthController {
                 userOptional = myAppUserRepository.findByEmail(authRequest.getEmail());
             }
 
-            if (!userOptional.isPresent()) {
+            if (userOptional.isEmpty()) {
                 return new ResponseEntity<>(AuthResponse.builder().status("error").jwt("").build(), HttpStatus.NOT_FOUND);
             }
             MyAppUser user = userOptional.get();

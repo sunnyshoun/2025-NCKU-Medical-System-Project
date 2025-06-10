@@ -4,7 +4,6 @@ import com.example.demo.model.MyAppUser;
 import com.example.demo.model.MyAppUserRepository;
 import com.example.demo.model.Role; // <-- 導入 Role 實體
 import com.example.demo.model.RoleRepository; // <-- 導入 RoleRepository
-import com.example.demo.model.UserRoleRepository; // <-- 導入 UserRoleRepository
 import com.example.demo.dto.AuthResponse;
 import com.example.demo.dto.RegisterRequest;
 import com.example.demo.utils.JwtTokenUtil;
