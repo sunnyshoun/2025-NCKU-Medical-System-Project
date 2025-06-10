@@ -1,11 +1,10 @@
-package com.example.demo.Controller;
+package com.example.demo.controller;
 
-import com.example.demo.Model.MyAppUser;
-import com.example.demo.Model.MyAppUserRepository;
-import com.example.demo.Model.Role; // <-- 導入 Role 實體
-import com.example.demo.Model.RoleRepository; // <-- 導入 RoleRepository
-import com.example.demo.Model.UserRole;     // <-- 導入 UserRole 實體
-import com.example.demo.Model.UserRoleRepository; // <-- 導入 UserRoleRepository
+import com.example.demo.model.MyAppUser;
+import com.example.demo.model.MyAppUserRepository;
+import com.example.demo.model.Role; // <-- 導入 Role 實體
+import com.example.demo.model.RoleRepository; // <-- 導入 RoleRepository
+import com.example.demo.model.UserRoleRepository; // <-- 導入 UserRoleRepository
 import com.example.demo.dto.AuthResponse;
 import com.example.demo.dto.RegisterRequest;
 import com.example.demo.utils.JwtTokenUtil;
@@ -23,7 +22,6 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
-import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -40,9 +38,6 @@ public class RegistrationController {
 
     @Autowired
     private RoleRepository roleRepository;
-
-    @Autowired
-    private UserRoleRepository userRoleRepository;
 
 
     /**

@@ -1,7 +1,7 @@
-package com.example.demo.Controller;
+package com.example.demo.controller;
 
-import com.example.demo.Model.MyAppUser;
-import com.example.demo.Model.MyAppUserRepository;
+import com.example.demo.model.MyAppUser;
+import com.example.demo.model.MyAppUserRepository;
 import com.example.demo.dto.AuthRequest;
 import com.example.demo.dto.AuthResponse;
 import com.example.demo.utils.JwtTokenUtil;
