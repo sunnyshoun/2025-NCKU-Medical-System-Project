@@ -1,12 +1,12 @@
-package com.example.demo.controller;
+package com.example.demo.controller; // 注意這裡的套件名稱是小寫 controller
 
+import com.example.demo.model.MyAppUser;
+import com.example.demo.repository.MyAppUserRepository;
+import com.example.demo.model.Role;
+import com.example.demo.repository.RoleRepository; // 注意這裡的 Repository 套件
 import com.example.demo.dto.AuthRequest;
 import com.example.demo.dto.AuthResponse;
-import com.example.demo.dto.RegisterRequest;
-import com.example.demo.model.MyAppUser;
-import com.example.demo.model.Role;
-import com.example.demo.repository.MyAppUserRepository;
-import com.example.demo.repository.RoleRepository;
+import com.example.demo.dto.RegisterRequest; // 導入 RegisterRequest
 import com.example.demo.utils.JwtTokenUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -16,10 +16,9 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.*; // 導入所有 RestController 相關註解
 
-import jakarta.validation.Valid;
-
+import jakarta.validation.Valid; // <-- 導入 @Valid 註解
 import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
@@ -55,17 +54,18 @@ public class AuthController {
      * @return ResponseEntity with AuthResponse containing status and JWT
      */
     @PostMapping("/register")
-    public ResponseEntity<AuthResponse> registerUser(@Valid @RequestBody RegisterRequest registerRequest) {
+    public ResponseEntity<AuthResponse> registerUser(@Valid @RequestBody RegisterRequest registerRequest) { // <-- 添加 @Valid
         try {
-            // Check for existing username or email
             Optional<MyAppUser> existingUserByUsernameOptional = myAppUserRepository.findByUsername(registerRequest.getUsername());
             Optional<MyAppUser> existingUserByEmailOptional = myAppUserRepository.findByEmail(registerRequest.getEmail());
 
-            if (existingUserByUsernameOptional.isPresent() || existingUserByEmailOptional.isPresent()) {
-                return new ResponseEntity<>(AuthResponse.builder().status("error").jwt("").build(), HttpStatus.CONFLICT);
+            if (existingUserByUsernameOptional.isPresent()) {
+                return new ResponseEntity<>(AuthResponse.builder().status("error").message("Username already exists").build(), HttpStatus.CONFLICT);
+            }
+            if (existingUserByEmailOptional.isPresent()) {
+                return new ResponseEntity<>(AuthResponse.builder().status("error").message("Email already exists").build(), HttpStatus.CONFLICT);
             }
 
-            // Create new user
             MyAppUser newUser = new MyAppUser();
             newUser.setEmail(registerRequest.getEmail());
             newUser.setUsername(registerRequest.getUsername());
@@ -74,26 +74,25 @@ public class AuthController {
             newUser.setGender(registerRequest.getGender());
             newUser.setOccupation(registerRequest.getJob());
 
-            // Assign default role
-            Optional<Role> userRoleOptional = roleRepository.findByName("ROLE_USER");
+            Optional<Role> userRoleOptional = roleRepository.findByName("USER"); // <-- 查找 "USER" 角色
             if (userRoleOptional.isEmpty()) {
-                System.err.println("Error: 'ROLE_USER' not found in roles table. Please initialize roles data.");
-                return new ResponseEntity<>(AuthResponse.builder().status("error").jwt("").build(), HttpStatus.INTERNAL_SERVER_ERROR);
+                System.err.println("Error: 'USER' role not found in roles table. Please initialize roles data from Docker init.sql.");
+                return new ResponseEntity<>(AuthResponse.builder().status("error").message("Server error: Default role not found").build(), HttpStatus.INTERNAL_SERVER_ERROR);
             }
             Role userRole = userRoleOptional.get();
             Set<Role> roles = new HashSet<>();
             roles.add(userRole);
             newUser.setRoles(roles);
 
-            // Save user and generate JWT
             MyAppUser savedUser = myAppUserRepository.save(newUser);
             final String jwt = jwtTokenUtil.generateToken(savedUser.getId().toString());
 
-            return new ResponseEntity<>(AuthResponse.builder().status("ok").jwt(jwt).build(), HttpStatus.CREATED);
+            return new ResponseEntity<>(AuthResponse.builder().status("ok").jwt(jwt).message("Registration successful").build(), HttpStatus.CREATED);
 
         } catch (Exception e) {
             System.err.println("Registration failed: " + e.getMessage());
-            return new ResponseEntity<>(AuthResponse.builder().status("error").jwt("").build(), HttpStatus.INTERNAL_SERVER_ERROR);
+            e.printStackTrace(); // 確保打印堆疊追蹤
+            return new ResponseEntity<>(AuthResponse.builder().status("error").message("Internal server error during registration: " + e.getMessage()).build(), HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -106,7 +105,7 @@ public class AuthController {
      * @return ResponseEntity with AuthResponse containing status and JWT
      */
     @PostMapping("/login")
-    public ResponseEntity<AuthResponse> login(@Valid @RequestBody AuthRequest authRequest) {
+    public ResponseEntity<AuthResponse> login(@Valid @RequestBody AuthRequest authRequest) { // <-- 添加 @Valid
         String accountIdentifier = null;
 
         if (authRequest.getUsername() != null && !authRequest.getUsername().isEmpty()) {
@@ -114,7 +113,8 @@ public class AuthController {
         } else if (authRequest.getEmail() != null && !authRequest.getEmail().isEmpty()) {
             accountIdentifier = authRequest.getEmail();
         } else {
-            return new ResponseEntity<>(AuthResponse.builder().status("error").jwt("").build(), HttpStatus.BAD_REQUEST);
+            // 這個情況會被 @AtLeastOneNotBlank 處理，但保留作為防禦性編程
+            return new ResponseEntity<>(AuthResponse.builder().status("error").message("Username or email must be provided").build(), HttpStatus.BAD_REQUEST);
         }
 
         try {
@@ -126,12 +126,13 @@ public class AuthController {
             }
 
             if (userOptional.isEmpty()) {
-                return new ResponseEntity<>(AuthResponse.builder().status("error").jwt("").build(), HttpStatus.NOT_FOUND);
+                return new ResponseEntity<>(AuthResponse.builder().status("error").message("User not found").build(), HttpStatus.NOT_FOUND);
             }
             MyAppUser user = userOptional.get();
 
             if (!user.isEnabled()) {
-                return new ResponseEntity<>(AuthResponse.builder().status("error").jwt("").build(), HttpStatus.FORBIDDEN);
+                // 這段邏輯在當前 MyAppUser.isEnabled() 總是回傳 true 的情況下不會觸發
+                return new ResponseEntity<>(AuthResponse.builder().status("error").message("Account is disabled").build(), HttpStatus.FORBIDDEN);
             }
 
             Authentication authentication = authenticationManager.authenticate(
@@ -140,12 +141,14 @@ public class AuthController {
 
             final String jwt = jwtTokenUtil.generateToken(user.getId().toString());
 
-            return new ResponseEntity<>(AuthResponse.builder().status("ok").jwt(jwt).build(), HttpStatus.OK);
+            return new ResponseEntity<>(AuthResponse.builder().status("ok").jwt(jwt).message("Login successful").build(), HttpStatus.OK);
 
         } catch (AuthenticationException e) {
-            return new ResponseEntity<>(AuthResponse.builder().status("error").jwt("").build(), HttpStatus.UNAUTHORIZED);
+            return new ResponseEntity<>(AuthResponse.builder().status("error").message("Invalid credentials").build(), HttpStatus.UNAUTHORIZED);
         } catch (Exception e) {
-            return new ResponseEntity<>(AuthResponse.builder().status("error").jwt("").build(), HttpStatus.INTERNAL_SERVER_ERROR);
+            System.err.println("Login failed: " + e.getMessage());
+            e.printStackTrace(); // 確保打印堆疊追蹤
+            return new ResponseEntity<>(AuthResponse.builder().status("error").message("Internal server error during login: " + e.getMessage()).build(), HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 

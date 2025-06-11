@@ -1,19 +1,21 @@
 server:
-  error:
-    include-message: always
-    include-binding-errors: always
+  port: 8080
+#  error:
+#    include-message: always
+#    include-binding-errors: always
 
 spring:
   datasource:
-    password: frank08270110
-    url: jdbc:postgresql://localhost:5432/registration
+    password: mysecretpassword
+    url: jdbc:postgresql://postgres:5432/postgres
     username: postgres
+    driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
       ddl-auto: update
     properties:
       hibernate:
-        dialect: org.hibernate.dialect.PostgreSQLDialect 
+        dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
     show-sql: true
 

@@ -40,10 +40,10 @@ public class MyAppUser implements UserDetails {
     @Column(name = "job", nullable = true)
     private String occupation;
 
-    @Column(name = "created_at", nullable = false, updatable = false)
+    @Column(name = "createdAt", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    @Column(name = "updated_at", nullable = false)
+    @Column(name = "updatedAt", nullable = false)
     private LocalDateTime updatedAt;
 
     @ManyToMany(fetch = FetchType.EAGER, cascade = CascadeType.ALL)
@@ -155,10 +155,10 @@ public class MyAppUser implements UserDetails {
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-
         Set<SimpleGrantedAuthority> authorities = new HashSet<>();
         for (Role role : roles) {
-            authorities.add(new SimpleGrantedAuthority(role.getName()));
+            // init.sql 插入的是 'USER' 和 'ADMIN'
+            authorities.add(new SimpleGrantedAuthority("ROLE_" + role.getName())); // 添加 'ROLE_' 前綴給 Spring Security
         }
         return authorities;
     }

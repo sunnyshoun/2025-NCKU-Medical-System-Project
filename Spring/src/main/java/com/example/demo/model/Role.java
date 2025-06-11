@@ -8,7 +8,7 @@ public class Role {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "role_id")
+    @Column(name = "roleID")
     private Integer roleId;
 
     @Column(unique = true, nullable = false) // 唯一name

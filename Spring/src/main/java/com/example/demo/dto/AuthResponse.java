@@ -21,4 +21,6 @@ public class AuthResponse {
      * JSON Web Token for authenticated user.
      */
     private String jwt;
+
+    private String message;
 }

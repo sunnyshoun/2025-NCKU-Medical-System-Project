@@ -7,10 +7,10 @@ import jakarta.persistence.*;
 public class Knowledge {
 
     @Id
-    @Column(name = "knowledge_id", nullable = false)
+    @Column(name = "knowledgeID", nullable = false)
     private String knowledgeId;
 
-    @Column(name = "knowledge_point", columnDefinition = "TEXT", nullable = false)
+    @Column(name = "knowledgePoint", columnDefinition = "TEXT", nullable = false)
     private String knowledgePoint; // 知識內容
 
     @Column(name = "tags", columnDefinition = "TEXT[]", nullable = false)
