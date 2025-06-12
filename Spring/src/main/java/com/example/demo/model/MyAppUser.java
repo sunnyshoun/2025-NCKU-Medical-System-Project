@@ -5,22 +5,20 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
-import java.time.LocalDateTime;
+import java.time.LocalDateTime; // 用於 createdAt 和 updatedAt
 import java.util.Collection;
-import java.util.HashSet;
-import java.util.Set;
-import java.util.UUID;
+import java.util.HashSet; // 用於 Set 集合
+import java.util.Set;     // 用於 Set 集合
+import java.util.UUID;    // 用於 ID 類型
 
-@Table(name = "users")
+@Table(name = "users") // <-- 映射到資料庫的 users 表
 @Entity
 public class MyAppUser implements UserDetails {
 
     @Id
-    
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-
-    @Column(name = "id", columnDefinition = "UUID DEFAULT gen_random_uuid()")
-    private UUID id;
+    @GeneratedValue(strategy = GenerationType.IDENTITY) // <-- 讓 Hibernate 期望資料庫自動生成 ID
+    @Column(name = "id", columnDefinition = "UUID DEFAULT gen_random_uuid()") // <-- 映射到資料庫的 'id' 欄位，並指定預設值
+    private UUID id; // <-- Java 屬性名為 camelCase
 
     @Column(unique = true, nullable = false)
     private String username;
@@ -37,26 +35,30 @@ public class MyAppUser implements UserDetails {
     @Column(nullable = true)
     private String gender;
 
-    @Column(name = "job", nullable = true)
+    @Column(name = "job", nullable = true) // <-- 映射到資料庫的 'job' 欄位 (init.sql 是 'job')
     private String occupation;
 
-    @Column(name = "createdAt", nullable = false, updatable = false)
+    // <-- 關鍵修改：屬性名為 camelCase，@Column(name = "...") 映射到 snake_case
+    @Column(name = "created_at", nullable = false, updatable = false) // <-- 映射到資料庫的 'created_at' 欄位
     private LocalDateTime createdAt;
 
-    @Column(name = "updatedAt", nullable = false)
+    @Column(name = "updated_at", nullable = false) // <-- 映射到資料庫的 'updated_at' 欄位
     private LocalDateTime updatedAt;
 
+    // Many-to-Many 關聯映射到 roles 表 (通過 user_roles 連接表)
     @ManyToMany(fetch = FetchType.EAGER, cascade = CascadeType.ALL)
     @JoinTable(
-        name = "user_roles",
-        joinColumns = @JoinColumn(name = "user_id"),
-        inverseJoinColumns = @JoinColumn(name = "role_id")
+        name = "user_roles", // 連接表的名稱
+        joinColumns = @JoinColumn(name = "user_id"), // 本實體 (users) 在連接表中的外鍵
+        inverseJoinColumns = @JoinColumn(name = "role_id") // 對方實體 (roles) 在連接表中的外鍵
     )
     private Set<Role> roles = new HashSet<>();
 
+    // JPA 無參構造函數
     public MyAppUser() {
     }
 
+    // 常用構造函數 (根據新的欄位調整)
     public MyAppUser(String username, String password, String email, String age, String gender, String occupation) {
         this.username = username;
         this.password = password;
@@ -64,9 +66,8 @@ public class MyAppUser implements UserDetails {
         this.age = age;
         this.gender = gender;
         this.occupation = occupation;
-
+        // createdAt 和 updatedAt 會在 @PrePersist/@PreUpdate 自動填充
     }
-
 
 
     public UUID getId() {
@@ -125,12 +126,11 @@ public class MyAppUser implements UserDetails {
     public void setOccupation(String occupation) {
         this.occupation = occupation;
     }
-
     public LocalDateTime getCreatedAt() {
         return createdAt;
     }
 
-    public void voidCreatedAt(LocalDateTime createdAt) {
+    public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
     }
 
@@ -150,15 +150,13 @@ public class MyAppUser implements UserDetails {
         this.roles = roles;
     }
 
-
-
-
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
         Set<SimpleGrantedAuthority> authorities = new HashSet<>();
         for (Role role : roles) {
-            // init.sql 插入的是 'USER' 和 'ADMIN'
-            authorities.add(new SimpleGrantedAuthority("ROLE_" + role.getName())); // 添加 'ROLE_' 前綴給 Spring Security
+            // <-- 關鍵修正：這裡對從資料庫讀到的角色名加上 'ROLE_' 前綴
+            // 因為 Spring Security 內部期望角色以 "ROLE_" 開頭
+            authorities.add(new SimpleGrantedAuthority("ROLE_" + role.getName())); 
         }
         return authorities;
     }

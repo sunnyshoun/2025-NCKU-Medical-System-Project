@@ -32,5 +32,4 @@ build/
 ### VS Code ###
 .vscode/
 
-PostgreSQL/
-docker-compose.yml
+

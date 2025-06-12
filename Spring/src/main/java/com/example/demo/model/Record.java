@@ -11,10 +11,10 @@ public class Record {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "recordID") //  record_id欄
+    @Column(name = "record_id") //  record_id欄
     private Long recordId;
 
-    @Column(name = "userID", nullable = false)
+    @Column(name = "user_id", nullable = false)
     private UUID userId;
 
     @Column(name = "corr_l", columnDefinition = "TEXT", nullable = true)
@@ -35,10 +35,10 @@ public class Record {
     @Column(name = "unco_r", columnDefinition = "TEXT", nullable = false)
     private String uncoR; // 右眼裸視力
 
-    @Column(name = "createdAt", nullable = false, updatable = false)
+    @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt; // 建立
 
-    @Column(name = "updatedAt", nullable = false)
+    @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt; // 更新
 
     public Record() {

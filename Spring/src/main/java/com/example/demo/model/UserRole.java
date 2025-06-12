@@ -12,11 +12,11 @@ import java.util.UUID;
 public class UserRole {
 
     @Id
-    @Column(name = "userID", nullable = false)
+    @Column(name = "user_id", nullable = false)
     private UUID userId; // 用戶id user_id -> userID
 
     @Id
-    @Column(name = "roleID", nullable = false)
+    @Column(name = "role_id", nullable = false)
     private Integer roleId; // 角色id
 
     public UserRole() {
