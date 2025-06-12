@@ -24,6 +24,9 @@ graph TD
     %% 後端層
     subgraph Backend [後端層]
         B[Java Spring Boot<br>Main Server]
+        subgraph External [外部服務]
+            E[xAI API<br>Grok-beta]
+        end
         subgraph Data [資料層]
             C[PostgreSQL<br>使用者資料 / 知識資料]
             D[Python VectorDB Server<br>FAISS + Sentence Transformers]
@@ -34,11 +37,6 @@ graph TD
     subgraph Hardware [硬體層]
         F[Raspberry Pi<br>視力檢測機器人]
         G[Arduino<br>馬達控制]
-    end
-    
-    %% 外部服務
-    subgraph External [外部服務]
-        E[xAI API<br>Grok-beta]
     end
 
     %% 資料流
