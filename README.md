@@ -61,7 +61,7 @@ graph TD
 - **硬體**：Raspberry Pi 4 Model B、Arduino Uno、穩定的網路連線。
 - **軟體**：
   - Python 3.10+（Rpi、VectorDB）
-  - Java 17+（Spring）
+  - Java 21+（Spring）
   - Flutter SDK（Flutter）
   - Arduino IDE（Arduino）
   - PostgreSQL 15+（資料庫）
