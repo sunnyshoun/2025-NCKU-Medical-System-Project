@@ -39,7 +39,7 @@ public class KnowledgeController {
     @PostMapping
     @Transactional
     @JwtAuth
-    public ResponseEntity<ApiResponse> createKnowledge(@Valid @RequestBody KnowledgeRequestWrapper requestWrapper) {
+    public ResponseEntity<ApiResponse<Void>> createKnowledge(@Valid @RequestBody KnowledgeRequestWrapper requestWrapper) {
         List<KnowledgeRequest> requests = requestWrapper.getKnowledges();
 
         // 檢查是否有重複的 knowledgeId

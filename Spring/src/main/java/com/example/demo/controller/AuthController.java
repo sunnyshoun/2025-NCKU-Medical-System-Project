@@ -176,7 +176,7 @@ public class AuthController {
 
     @PostMapping("/logout")
     @JwtAuth
-    public ResponseEntity<ApiResponse> logout() {
+    public ResponseEntity<ApiResponse<Void>> logout() {
         try {
             // Aspect 已驗證 token，僅需刪除 JTI
             String refreshToken = (String) request.getAttribute("jwt_token");
