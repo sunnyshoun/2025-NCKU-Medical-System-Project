@@ -1,11 +1,12 @@
-package com.example.demo.model;
+package com.example.demo.service;
 
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
-import com.example.demo.repository.MyAppUserRepository;
+import com.example.demo.model.User;
+import com.example.demo.repository.UserRepository;
 
 import java.util.Optional;
 
@@ -13,20 +14,20 @@ import lombok.AllArgsConstructor;
 
 @Service
 @AllArgsConstructor
-public class MyAppUserService implements UserDetailsService {
+public class UserService implements UserDetailsService {
 
-    private final MyAppUserRepository repository;
+    private final UserRepository repository;
 
     @Override
     public UserDetails loadUserByUsername(String account) throws UsernameNotFoundException {
         
-        Optional<MyAppUser> userByEmailOptional = repository.findByEmail(account); 
+        Optional<User> userByEmailOptional = repository.findByEmail(account); 
 
         if (userByEmailOptional.isPresent()) {
             return userByEmailOptional.get();
         }
 
-        Optional<MyAppUser> userByUsernameOptional = repository.findByUsername(account); 
+        Optional<User> userByUsernameOptional = repository.findByUsername(account); 
 
         if (userByUsernameOptional.isPresent()) {
             return userByUsernameOptional.get();

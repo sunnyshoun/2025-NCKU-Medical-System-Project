@@ -1,32 +1,33 @@
 package com.example.demo.controller;
 
-import com.example.demo.model.MyAppUser;
-import com.example.demo.repository.MyAppUserRepository;
+import com.example.demo.annotation.JwtAuth;
+import com.example.demo.dto.ApiResponse;
+import com.example.demo.dto.AuthResponse;
+import com.example.demo.model.JwtId;
+import com.example.demo.model.User;
+import com.example.demo.repository.UserRepository;
 import com.example.demo.model.Role;
 import com.example.demo.repository.RoleRepository;
-import com.example.demo.dto.AuthRequest;
-import com.example.demo.dto.AuthResponse;
+import com.example.demo.dto.LoginRequest;
 import com.example.demo.dto.RegisterRequest;
+import com.example.demo.service.JwtIdService;
 import com.example.demo.utils.JwtTokenUtil;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
-import jakarta.validation.Valid;
-
 import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 
-/**
- * Controller for handling authentication-related operations, including user registration and login.
- */
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
@@ -38,7 +39,7 @@ public class AuthController {
     private JwtTokenUtil jwtTokenUtil;
 
     @Autowired
-    private MyAppUserRepository myAppUserRepository;
+    private UserRepository userRepository;
 
     @Autowired
     private PasswordEncoder passwordEncoder;
@@ -46,30 +47,26 @@ public class AuthController {
     @Autowired
     private RoleRepository roleRepository;
 
-    /**
-     * Handles user registration.
-     * Endpoint: POST /api/auth/register
-     * Creates a new user with the provided details and assigns a default "USER" role.
-     *
-     * @param registerRequest DTO containing username, password, email, and optional fields (age, gender, job)
-     * @return ResponseEntity with AuthResponse containing status and JWT
-     */
+    @Autowired
+    private JwtIdService jwtIdService;
+
+    @Autowired
+    private HttpServletRequest request;
+
     @PostMapping("/register")
-    public ResponseEntity<AuthResponse> registerUser(@Valid @RequestBody RegisterRequest registerRequest) {
+    public ResponseEntity<ApiResponse<AuthResponse>> registerUser(@Valid @RequestBody RegisterRequest registerRequest) {
         try {
-            // Check for existing username or email
-            Optional<MyAppUser> existingUserByUsernameOptional = myAppUserRepository.findByUsername(registerRequest.getUsername());
-            Optional<MyAppUser> existingUserByEmailOptional = myAppUserRepository.findByEmail(registerRequest.getEmail());
+            Optional<User> existingUserByUsernameOptional = userRepository.findByUsername(registerRequest.getUsername());
+            Optional<User> existingUserByEmailOptional = userRepository.findByEmail(registerRequest.getEmail());
 
             if (existingUserByUsernameOptional.isPresent()) {
-                return new ResponseEntity<>(AuthResponse.builder().status("error").message("Username already exists").build(), HttpStatus.CONFLICT);
+                return new ResponseEntity<>(ApiResponse.error("用戶名已存在"), HttpStatus.CONFLICT);
             }
             if (existingUserByEmailOptional.isPresent()) {
-                return new ResponseEntity<>(AuthResponse.builder().status("error").message("Email already exists").build(), HttpStatus.CONFLICT);
+                return new ResponseEntity<>(ApiResponse.error("電子郵件已存在"), HttpStatus.CONFLICT);
             }
 
-            // Create new user
-            MyAppUser newUser = new MyAppUser();
+            User newUser = new User();
             newUser.setEmail(registerRequest.getEmail());
             newUser.setUsername(registerRequest.getUsername());
             newUser.setPassword(passwordEncoder.encode(registerRequest.getPassword()));
@@ -77,92 +74,123 @@ public class AuthController {
             newUser.setGender(registerRequest.getGender());
             newUser.setOccupation(registerRequest.getJob());
 
-            // Assign default role
-            // <-- 關鍵修正：這裡查找 "USER" 角色 (沒有 'ROLE_' 前綴)
-            Optional<Role> userRoleOptional = roleRepository.findByName("USER"); 
+            Optional<Role> userRoleOptional = roleRepository.findByName("USER");
             if (userRoleOptional.isEmpty()) {
-                System.err.println("Error: 'USER' role not found in roles table. Please initialize roles data from Docker init.sql.");
-                return new ResponseEntity<>(AuthResponse.builder().status("error").message("Server error: Default role not found").build(), HttpStatus.INTERNAL_SERVER_ERROR);
+                return new ResponseEntity<>(ApiResponse.error("預期外的使用者身分"), HttpStatus.INTERNAL_SERVER_ERROR);
             }
             Role userRole = userRoleOptional.get();
             Set<Role> roles = new HashSet<>();
             roles.add(userRole);
             newUser.setRoles(roles);
 
-            // Save user and generate JWT
-            MyAppUser savedUser = myAppUserRepository.save(newUser);
-            final String jwt = jwtTokenUtil.generateToken(savedUser.getId().toString());
+            User savedUser = userRepository.save(newUser);
+            String accessToken = jwtTokenUtil.generateAccessToken(savedUser.getId());
+            String refreshToken = jwtIdService.createRefreshToken(savedUser);
 
-            return new ResponseEntity<>(AuthResponse.builder().status("ok").jwt(jwt).message("Registration successful").build(), HttpStatus.CREATED);
+            return new ResponseEntity<>(ApiResponse.success(new AuthResponse(accessToken, refreshToken)), HttpStatus.CREATED);
 
         } catch (Exception e) {
-            System.err.println("Registration failed: " + e.getMessage());
+            System.err.println("註冊失敗: " + e.getMessage());
             e.printStackTrace();
-            return new ResponseEntity<>(AuthResponse.builder().status("error").message("Internal server error during registration: " + e.getMessage()).build(), HttpStatus.INTERNAL_SERVER_ERROR);
+            return new ResponseEntity<>(ApiResponse.error("伺服器內部錯誤"), HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
-    /**
-     * Handles user login.
-     * Endpoint: POST /api/auth/login
-     * Supports login via username or email with password.
-     *
-     * @param authRequest DTO containing username/email and password
-     * @return ResponseEntity with AuthResponse containing status and JWT
-     */
     @PostMapping("/login")
-    public ResponseEntity<AuthResponse> login(@Valid @RequestBody AuthRequest authRequest) {
+    public ResponseEntity<ApiResponse<AuthResponse>> login(@Valid @RequestBody LoginRequest loginRequest) {
         String accountIdentifier = null;
 
-        if (authRequest.getUsername() != null && !authRequest.getUsername().isEmpty()) {
-            accountIdentifier = authRequest.getUsername();
-        } else if (authRequest.getEmail() != null && !authRequest.getEmail().isEmpty()) {
-            accountIdentifier = authRequest.getEmail();
+        if (loginRequest.getUsername() != null && !loginRequest.getUsername().isEmpty()) {
+            accountIdentifier = loginRequest.getUsername();
+        } else if (loginRequest.getEmail() != null && !loginRequest.getEmail().isEmpty()) {
+            accountIdentifier = loginRequest.getEmail();
         } else {
-            return new ResponseEntity<>(AuthResponse.builder().status("error").message("Username or email must be provided").build(), HttpStatus.BAD_REQUEST);
+            return new ResponseEntity<>(ApiResponse.error("必須提供用戶名或電子郵件"), HttpStatus.BAD_REQUEST);
         }
 
         try {
-            Optional<MyAppUser> userOptional;
-            if (authRequest.getUsername() != null && !authRequest.getUsername().isEmpty()) {
-                userOptional = myAppUserRepository.findByUsername(authRequest.getUsername());
+            Optional<User> userOptional;
+            if (loginRequest.getUsername() != null && !loginRequest.getUsername().isEmpty()) {
+                userOptional = userRepository.findByUsername(loginRequest.getUsername());
             } else {
-                userOptional = myAppUserRepository.findByEmail(authRequest.getEmail());
+                userOptional = userRepository.findByEmail(loginRequest.getEmail());
             }
 
             if (userOptional.isEmpty()) {
-                return new ResponseEntity<>(AuthResponse.builder().status("error").message("User not found").build(), HttpStatus.NOT_FOUND);
+                return new ResponseEntity<>(ApiResponse.error("用戶不存在"), HttpStatus.NOT_FOUND);
             }
-            MyAppUser user = userOptional.get();
+            User user = userOptional.get();
 
             if (!user.isEnabled()) {
-                return new ResponseEntity<>(AuthResponse.builder().status("error").message("Account is disabled").build(), HttpStatus.FORBIDDEN);
+                return new ResponseEntity<>(ApiResponse.error("帳戶已被禁用"), HttpStatus.FORBIDDEN);
             }
 
-            Authentication authentication = authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(accountIdentifier, authRequest.getPassword())
+            authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(accountIdentifier, loginRequest.getPassword())
             );
 
-            final String jwt = jwtTokenUtil.generateToken(user.getId().toString());
+            String accessToken = jwtTokenUtil.generateAccessToken(user.getId());
+            String refreshToken = jwtIdService.createRefreshToken(user);
 
-            return new ResponseEntity<>(AuthResponse.builder().status("ok").jwt(jwt).message("Login successful").build(), HttpStatus.OK);
+            return new ResponseEntity<>(ApiResponse.success(new AuthResponse(accessToken, refreshToken)), HttpStatus.OK);
 
         } catch (AuthenticationException e) {
-            return new ResponseEntity<>(AuthResponse.builder().status("error").message("Invalid credentials").build(), HttpStatus.UNAUTHORIZED);
+            return new ResponseEntity<>(ApiResponse.error("無效的憑證"), HttpStatus.UNAUTHORIZED);
         } catch (Exception e) {
-            System.err.println("Login failed: " + e.getMessage());
+            System.err.println("登錄失敗: " + e.getMessage());
             e.printStackTrace();
-            return new ResponseEntity<>(AuthResponse.builder().status("error").message("Internal server error during login: " + e.getMessage()).build(), HttpStatus.INTERNAL_SERVER_ERROR);
+            return new ResponseEntity<>(ApiResponse.error("伺服器內部錯誤"), HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
-    /**
-     * Handles email verification.
-     * Endpoint: GET /api/auth/verify-email
-     *
-     * @param token Verification token
-     * @return ResponseEntity with verification status
-     */
+    @PostMapping("/refresh")
+    @JwtAuth
+    public ResponseEntity<ApiResponse<AuthResponse>> refreshToken() {
+        try {
+            // Aspect 已驗證 token 並設置用戶，獲取當前用戶
+            User user = (User) request.getAttribute("current_user");
+            if (user == null) {
+                return new ResponseEntity<>(ApiResponse.error("用戶不存在"), HttpStatus.NOT_FOUND);
+            }
+
+            // 從 request 獲取 refresh token
+            String refreshToken = (String) request.getAttribute("jwt_token");
+            String jti = jwtTokenUtil.extractJti(refreshToken);
+            Optional<JwtId> storedTokenOptional = jwtIdService.findByJti(jti);
+            if (storedTokenOptional.isEmpty()) {
+                return new ResponseEntity<>(ApiResponse.error("Refresh Token 不存在或已被註銷"), HttpStatus.UNAUTHORIZED);
+            }
+
+            // 生成新的 Access Token 和 Refresh Token
+            String newAccessToken = jwtTokenUtil.generateAccessToken(user.getId());
+            String newRefreshToken = jwtIdService.createRefreshToken(user); // 自動刪除舊 JTI
+
+            return new ResponseEntity<>(ApiResponse.success(new AuthResponse(newAccessToken, newRefreshToken)), HttpStatus.OK);
+
+        } catch (Exception e) {
+            System.err.println("Token 刷新失敗: " + e.getMessage());
+            e.printStackTrace();
+            return new ResponseEntity<>(ApiResponse.error("伺服器內部錯誤"), HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    @PostMapping("/logout")
+    @JwtAuth
+    public ResponseEntity<ApiResponse> logout() {
+        try {
+            // Aspect 已驗證 token，僅需刪除 JTI
+            String refreshToken = (String) request.getAttribute("jwt_token");
+            String jti = jwtTokenUtil.extractJti(refreshToken);
+            jwtIdService.deleteRefreshToken(jti);
+
+            return new ResponseEntity<>(ApiResponse.success(), HttpStatus.OK);
+        } catch (Exception e) {
+            System.err.println("登出失敗: " + e.getMessage());
+            e.printStackTrace();
+            return new ResponseEntity<>(ApiResponse.error("伺服器內部錯誤"), HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
     @GetMapping("/verify-email")
     public ResponseEntity<String> verifyEmail(@RequestParam String token) {
         return new ResponseEntity<>("Email verification is currently disabled.", HttpStatus.OK);

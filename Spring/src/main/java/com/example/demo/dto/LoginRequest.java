@@ -6,7 +6,7 @@ import lombok.Data;
 
 @Data
 @AtLeastOneNotBlank(fields = {"username", "email"}, message = "At least one of username or email must be provided")
-public class AuthRequest {
+public class LoginRequest {
 
     private String username;
 

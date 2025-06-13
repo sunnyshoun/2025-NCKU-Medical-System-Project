@@ -20,8 +20,8 @@ import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
-import com.example.demo.model.MyAppUserService;
 import com.example.demo.filter.JwtAuthFilter;
+import com.example.demo.service.UserService;
 
 import lombok.AllArgsConstructor;
 
@@ -32,7 +32,7 @@ import java.io.IOException;
 @EnableWebSecurity
 public class SecurityConfig {
 
-    private final MyAppUserService appUserService;
+    private final UserService appUserService;
     private final JwtAuthFilter jwtAuthFilter;
 
     @Bean

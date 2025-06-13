@@ -1,9 +1,15 @@
 package com.example.demo.model;
 
 import jakarta.persistence.*;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
 
 @Table(name = "roles")
 @Entity
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
 public class Role {
 
     @Id
@@ -11,30 +17,6 @@ public class Role {
     @Column(name = "role_id")
     private Integer roleId;
 
-    @Column(unique = true, nullable = false) // 唯一name
+    @Column(unique = true, nullable = false)
     private String name;
-
-    public Role() {
-    }
-
-    public Role(String name) {
-        this.name = name;
-    }
-
-
-    public Integer getRoleId() {
-        return roleId;
-    }
-
-    public void setRoleId(Integer roleId) {
-        this.roleId = roleId;
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public void setName(String name) {
-        this.name = name;
-    }
 }

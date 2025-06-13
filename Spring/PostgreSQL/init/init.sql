@@ -47,6 +47,12 @@ CREATE TABLE IF NOT EXISTS knowledges (
     source TEXT NOT NULL
 );
 
+-- Creating jti table
+CREATE TABLE IF NOT EXISTS jwt_ids (
+    jti TEXT PRIMARY KEY,
+    user_id UUID REFERENCES users(id)
+);
+
 -- 確保 UUID 擴充套件已安裝
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 

@@ -1,8 +1,9 @@
 package com.example.demo.controller;
 
+import com.example.demo.annotation.JwtAuth;
+import com.example.demo.dto.ApiResponse;
 import com.example.demo.dto.KnowledgeRequest;
 import com.example.demo.dto.KnowledgeRequestWrapper;
-import com.example.demo.dto.KnowledgeResponse;
 import com.example.demo.model.Knowledge;
 import com.example.demo.repository.KnowledgeRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,32 +26,20 @@ public class KnowledgeController {
     @Autowired
     private KnowledgeRepository knowledgeRepository;
 
-    /**
-     * 根據 ID 取得知識資料
-     * Endpoint: GET /api/knowledge/{id}
-     *
-     * @param id 知識資料的 ID
-     * @return ResponseEntity 包含知識資料或錯誤回應
-     */
     @GetMapping("/{id}")
-    public ResponseEntity<?> getKnowledgeById(@PathVariable String id) {
+    @JwtAuth
+    public ResponseEntity<ApiResponse<Knowledge>> getKnowledgeById(@PathVariable String id) {
         Knowledge knowledge = knowledgeRepository.findByKnowledgeId(id);
         if (knowledge == null) {
-            return new ResponseEntity<>(KnowledgeResponse.error("知識資料不存在", "ID: " + id + " 的知識資料未找到"), HttpStatus.NOT_FOUND);
+            return new ResponseEntity<>(ApiResponse.error("查無知識資料"), HttpStatus.NOT_FOUND);
         }
-        return new ResponseEntity<>(knowledge, HttpStatus.OK);
+        return new ResponseEntity<>(ApiResponse.success(knowledge), HttpStatus.OK);
     }
 
-    /**
-     * 新增單筆或多筆知識資料
-     * Endpoint: POST /api/knowledge
-     *
-     * @param requestWrapper 包含單筆或多筆知識資料的請求體
-     * @return ResponseEntity 包含新增結果
-     */
     @PostMapping
     @Transactional
-    public ResponseEntity<KnowledgeResponse> createKnowledge(@Valid @RequestBody KnowledgeRequestWrapper requestWrapper) {
+    @JwtAuth
+    public ResponseEntity<ApiResponse> createKnowledge(@Valid @RequestBody KnowledgeRequestWrapper requestWrapper) {
         List<KnowledgeRequest> requests = requestWrapper.getKnowledges();
 
         // 檢查是否有重複的 knowledgeId
@@ -62,10 +51,7 @@ public class KnowledgeController {
             List<String> existingIds = existingKnowledge.stream()
                 .map(Knowledge::getKnowledgeId)
                 .collect(Collectors.toList());
-            return new ResponseEntity<>(
-                KnowledgeResponse.error("無效的知識資料", "以下知識 ID 已存在: " + String.join(", ", existingIds)),
-                HttpStatus.UNPROCESSABLE_ENTITY
-            );
+            return new ResponseEntity<>(ApiResponse.error("entity error", "以下知識 ID 已存在: " + String.join(", ", existingIds)), HttpStatus.UNPROCESSABLE_ENTITY);
         }
 
         // 將 KnowledgeRequest 轉換為 Knowledge 物件
@@ -82,12 +68,9 @@ public class KnowledgeController {
         // 批量儲存
         try {
             knowledgeRepository.saveAll(knowledges);
-            return new ResponseEntity<>(KnowledgeResponse.success("知識資料新增成功"), HttpStatus.CREATED);
+            return new ResponseEntity<>(ApiResponse.success(), HttpStatus.CREATED);
         } catch (Exception e) {
-            return new ResponseEntity<>(
-                KnowledgeResponse.error("新增知識資料時發生錯誤", e.getMessage()),
-                HttpStatus.INTERNAL_SERVER_ERROR
-            );
+            return new ResponseEntity<>(ApiResponse.error("server error", e.getMessage()), HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 }
