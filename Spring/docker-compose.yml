@@ -8,10 +8,9 @@ services:
       POSTGRES_PASSWORD: mysecretpassword
     volumes:
       - ./PostgreSQL/backups:/backups
-      #- ./PostgreSQL/config/postgresql.conf:/etc/postgresql/postgresql.conf
+      - ./PostgreSQL/config/postgresql.conf:/etc/postgresql/postgresql.conf
       - ./PostgreSQL/config/:/etc/postgresql/
       - ./PostgreSQL/init:/docker-entrypoint-initdb.d/
-      - ./testfiles:/testfiles
     entrypoint: ["/bin/bash", "/docker-entrypoint-initdb.d/pg-entrypoint.sh"]
     networks:
       - net

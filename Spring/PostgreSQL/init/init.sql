@@ -60,7 +60,7 @@ INSERT INTO users (id, username, password, email, age, gender, job, created_at, 
 VALUES (
     '123e4567-e89b-12d3-a456-426614174000',
     'dockeruser',
-    '$2a$10$8j9k2l3m4n5o6p7q8r9s0t1u2v3w4x5y6z7a8b9c0d1e2f3g4h5i6j', -- BCrypt hash (密碼可能是 'testpassword')
+    '$2y$10$oQTRm468nkTOz7IUCPnKZOpND1cgtaZBfN1btk.aH2D3V/v/.6ywW', -- BCrypt hash ('password')
     'dockeruser@example.com',
     '25', 'Male', 'Engineer',
     now(), now()
