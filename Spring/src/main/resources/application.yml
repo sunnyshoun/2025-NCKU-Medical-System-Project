@@ -3,7 +3,11 @@ server:
 #  error:
 #    include-message: always
 #    include-binding-errors: always
-
+public:
+  endpoints:
+    - /api/auth/register
+    - /api/auth/login
+    - /api/auth/verify-email
 spring:
   datasource:
     username: postgres
@@ -17,7 +21,6 @@ spring:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
     show-sql: true
-
 #logging: #debug
  # level:
   #  org.springframework: DEBUG

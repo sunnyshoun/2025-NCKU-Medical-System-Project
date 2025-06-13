@@ -1,6 +1,5 @@
 package com.example.demo.controller;
 
-import com.example.demo.annotation.JwtAuth;
 import com.example.demo.dto.ApiResponse;
 import com.example.demo.dto.KnowledgeRequest;
 import com.example.demo.dto.KnowledgeRequestWrapper;
@@ -27,7 +26,6 @@ public class KnowledgeController {
     private KnowledgeRepository knowledgeRepository;
 
     @GetMapping("/{id}")
-    @JwtAuth
     public ResponseEntity<ApiResponse<Knowledge>> getKnowledgeById(@PathVariable String id) {
         Knowledge knowledge = knowledgeRepository.findByKnowledgeId(id);
         if (knowledge == null) {
@@ -38,32 +36,31 @@ public class KnowledgeController {
 
     @PostMapping
     @Transactional
-    @JwtAuth
     public ResponseEntity<ApiResponse<Void>> createKnowledge(@Valid @RequestBody KnowledgeRequestWrapper requestWrapper) {
         List<KnowledgeRequest> requests = requestWrapper.getKnowledges();
 
         // 檢查是否有重複的 knowledgeId
         List<String> requestIds = requests.stream()
-            .map(KnowledgeRequest::getId)
-            .collect(Collectors.toList());
+                .map(KnowledgeRequest::getId)
+                .collect(Collectors.toList());
         List<Knowledge> existingKnowledge = knowledgeRepository.findByKnowledgeIdIn(requestIds);
         if (!existingKnowledge.isEmpty()) {
             List<String> existingIds = existingKnowledge.stream()
-                .map(Knowledge::getKnowledgeId)
-                .collect(Collectors.toList());
+                    .map(Knowledge::getKnowledgeId)
+                    .collect(Collectors.toList());
             return new ResponseEntity<>(ApiResponse.error("entity error", "以下知識 ID 已存在: " + String.join(", ", existingIds)), HttpStatus.UNPROCESSABLE_ENTITY);
         }
 
         // 將 KnowledgeRequest 轉換為 Knowledge 物件
         List<Knowledge> knowledges = requests.stream()
-            .map(req -> new Knowledge(
-                req.getId(),
-                req.getKnowledgePoint(),
-                req.getTags(),
-                req.getSummary(),
-                req.getSource()
-            ))
-            .collect(Collectors.toList());
+                .map(req -> new Knowledge(
+                        req.getId(),
+                        req.getKnowledgePoint(),
+                        req.getTags(),
+                        req.getSummary(),
+                        req.getSource()
+                ))
+                .collect(Collectors.toList());
 
         // 批量儲存
         try {
