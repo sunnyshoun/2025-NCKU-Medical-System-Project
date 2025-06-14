@@ -4,8 +4,8 @@ import numpy as np
 import pickle
 from typing import List
 from sentence_transformers import SentenceTransformer
-from .schemas import SearchResult, AppendRequest
-from .config import MODEL_NAME, FAISS_INDEX_PATH, ID_MAPPING_PATH, BATCH_SIZE
+from schemas import SearchResult, AppendRequest
+from config import MODEL_NAME, FAISS_INDEX_PATH, ID_MAPPING_PATH, BATCH_SIZE
 
 class FAISSVectorDB:
     def __init__(self):
