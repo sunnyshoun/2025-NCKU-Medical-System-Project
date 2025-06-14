@@ -83,6 +83,88 @@ VALUES (
     now(), now()
 ) ON CONFLICT (record_id) DO NOTHING;
 
+-- 插入多個記錄，相同的用戶 ID 和不同的 record_id
+-- 1
+INSERT INTO records (record_id, user_id, corr_l, diopter_l, corr_r, diopter_r, unco_l, unco_r, created_at, updated_at)
+VALUES (
+    'bbbbbbbb-bbbb-cccc-dddd-123412341234', '123e4567-e89b-12d3-a456-426614174000',
+    '1.0', '2.0D', '1.0', '1.5D', '0.4', '0.5',
+    now(), now()
+) ON CONFLICT (record_id) DO NOTHING;
+
+-- 2
+INSERT INTO records (record_id, user_id, corr_l, diopter_l, corr_r, diopter_r, unco_l, unco_r, created_at, updated_at)
+VALUES (
+    'cccccccc-bbbb-cccc-dddd-123412341234', '123e4567-e89b-12d3-a456-426614174000',
+    '1.1', '1.9D', '1.0', '1.6D', '1.2', '1.2',
+    now(), now()
+) ON CONFLICT (record_id) DO NOTHING;
+
+-- 3
+INSERT INTO records (record_id, user_id, corr_l, diopter_l, corr_r, diopter_r, unco_l, unco_r, created_at, updated_at)
+VALUES (
+    'dddddddd-bbbb-cccc-dddd-123412341234', '123e4567-e89b-12d3-a456-426614174000',
+    'NULL', '2.0D', '1.0', '1.5D', '0.4', '0.5',
+    now(), now()
+) ON CONFLICT (record_id) DO NOTHING;
+
+-- 4
+INSERT INTO records (record_id, user_id, corr_l, diopter_l, corr_r, diopter_r, unco_l, unco_r, created_at, updated_at)
+VALUES (
+    'eeeeeeee-bbbb-cccc-dddd-123412341234', '123e4567-e89b-12d3-a456-426614174000',
+    '0.0', 'NULL', '0.0', 'NULL', '2.0', '2.0',
+    now(), now()
+) ON CONFLICT (record_id) DO NOTHING;
+
+-- 5
+INSERT INTO records (record_id, user_id, corr_l, diopter_l, corr_r, diopter_r, unco_l, unco_r, created_at, updated_at)
+VALUES (
+    'ffffffff-bbbb-cccc-dddd-123412341234', '123e4567-e89b-12d3-a456-426614174000',
+    '0.5', '-2.0D', '-1.0', '1.5D', '1.0', '1.0',
+    now(), now()
+) ON CONFLICT (record_id) DO NOTHING;
+
+-- 6
+INSERT INTO records (record_id, user_id, corr_l, diopter_l, corr_r, diopter_r, unco_l, unco_r, created_at, updated_at)
+VALUES (
+    '00000000-bbbb-cccc-dddd-123412341234', '123e4567-e89b-12d3-a456-426614174000',
+    '1.1', '2.1D', 'NULL', 'NULL', '2.0', '2.0',
+    now(), now()
+) ON CONFLICT (record_id) DO NOTHING;
+
+-- 7
+INSERT INTO records (record_id, user_id, corr_l, diopter_l, corr_r, diopter_r, unco_l, unco_r, created_at, updated_at)
+VALUES (
+    '11111111-bbbb-cccc-dddd-123412341234', '123e4567-e89b-12d3-a456-426614174000',
+    'NULL', 'NULL', 'NULL', 'NULL', '2.0', '2.0',
+    now(), now()
+) ON CONFLICT (record_id) DO NOTHING;
+
+-- 8
+INSERT INTO records (record_id, user_id, corr_l, diopter_l, corr_r, diopter_r, unco_l, unco_r, created_at, updated_at)
+VALUES (
+    '22222222-bbbb-cccc-dddd-123412341234', '123e4567-e89b-12d3-a456-426614174000',
+    '0.3', '0.6', '0.9', '0.2D', '0.4', '0.5',
+    now(), now()
+) ON CONFLICT (record_id) DO NOTHING;
+
+-- 9
+INSERT INTO records (record_id, user_id, corr_l, diopter_l, corr_r, diopter_r, unco_l, unco_r, created_at, updated_at)
+VALUES (
+    '33333333-bbbb-cccc-dddd-123412341234', '123e4567-e89b-12d3-a456-426614174000',
+    '0.2', 'NULL', '1.0', '1.5D', '0.0', '0.0',
+    now(), now()
+) ON CONFLICT (record_id) DO NOTHING;
+
+-- 10
+INSERT INTO records (record_id, user_id, corr_l, diopter_l, corr_r, diopter_r, unco_l, unco_r, created_at, updated_at)
+VALUES (
+    '44444444-bbbb-cccc-dddd-123412341234', '123e4567-e89b-12d3-a456-426614174000',
+    '1.0', 'NULL', 'NULL', '2.0D', '0.2', '0.1',
+    now(), now()
+) ON CONFLICT (record_id) DO NOTHING;
+
+
 INSERT INTO knowledges (knowledge_id, knowledge_point, tags, summary, source)
 VALUES (
     'initial-knowledge-1',
