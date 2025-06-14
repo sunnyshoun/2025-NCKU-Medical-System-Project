@@ -5,6 +5,7 @@ import com.example.demo.dto.RecordRequest;
 import com.example.demo.dto.RecordResponse;
 import com.example.demo.dto.UserProfileRequest;
 import com.example.demo.dto.UserProfileResponse;
+import com.example.demo.exception.BusinessException;
 import com.example.demo.model.User;
 import com.example.demo.model.Record;
 import com.example.demo.repository.UserRepository;
@@ -19,7 +20,6 @@ import jakarta.validation.Valid;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -61,28 +61,18 @@ public class UserController {
      */
     @PutMapping("/profile")
     public ResponseEntity<ApiResponse<Void>> updateUserProfile(@Valid @RequestBody UserProfileRequest profileRequest,
-                                                                             @AuthenticationPrincipal User currentUser) {
-        try {
-            Optional<User> userOptional = userRepository.findById(currentUser.getId());
-            if (userOptional.isEmpty()) {
-                return new ResponseEntity<>(ApiResponse.error("查無用戶"), HttpStatus.NOT_FOUND);
-            }
-            User userToUpdate = userOptional.get();
+                                                              @AuthenticationPrincipal User currentUser) {
+        User userToUpdate = userRepository.findById(currentUser.getId())
+            .orElseThrow(() -> new BusinessException("USER_NOT_FOUND", "查無用戶", HttpStatus.NOT_FOUND));
 
-            userToUpdate.setUsername(profileRequest.getUsername());
-            userToUpdate.setEmail(profileRequest.getEmail());
-            userToUpdate.setAge(profileRequest.getAge());
-            userToUpdate.setGender(profileRequest.getGender());
-            userToUpdate.setOccupation(profileRequest.getJob());
+        userToUpdate.setUsername(profileRequest.getUsername());
+        userToUpdate.setEmail(profileRequest.getEmail());
+        userToUpdate.setAge(profileRequest.getAge());
+        userToUpdate.setGender(profileRequest.getGender());
+        userToUpdate.setOccupation(profileRequest.getJob());
 
-            userRepository.save(userToUpdate);
-
-            return new ResponseEntity<>(ApiResponse.success(), HttpStatus.OK);
-        } catch (Exception e) {
-            System.err.println("用戶資料更新失敗: " + e.getMessage());
-            e.printStackTrace();
-            return new ResponseEntity<>(ApiResponse.error("伺服器內部錯誤"), HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        userRepository.save(userToUpdate);
+        return new ResponseEntity<>(ApiResponse.success(), HttpStatus.OK);
     }
 
     /**
@@ -122,7 +112,8 @@ public class UserController {
      * 需要JWT Token
      */
     @PostMapping("/records")
-    public ResponseEntity<ApiResponse<Void>> createRecord(@Valid @RequestBody RecordRequest recordRequest, @AuthenticationPrincipal User currentUser) {
+    public ResponseEntity<ApiResponse<Void>> createRecord(@Valid @RequestBody RecordRequest recordRequest, 
+                                                         @AuthenticationPrincipal User currentUser) {
         Record record = Record.builder()
             .userId(currentUser.getId())
             .uncoL(recordRequest.getUnco_l())

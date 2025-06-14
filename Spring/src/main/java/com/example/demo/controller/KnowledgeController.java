@@ -4,6 +4,7 @@ import com.example.demo.dto.ApiResponse;
 import com.example.demo.dto.KnowledgeRequest;
 import com.example.demo.dto.KnowledgeRequestWrapper;
 import com.example.demo.dto.KnowledgeResponse;
+import com.example.demo.exception.BusinessException;
 import com.example.demo.model.Knowledge;
 import com.example.demo.repository.KnowledgeRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,7 +31,7 @@ public class KnowledgeController {
     public ResponseEntity<ApiResponse<KnowledgeResponse>> getKnowledgeById(@PathVariable String id) {
         Knowledge knowledge = knowledgeRepository.findByKnowledgeId(id);
         if (knowledge == null) {
-            return new ResponseEntity<>(ApiResponse.error("查無知識資料"), HttpStatus.NOT_FOUND);
+            throw new BusinessException("KNOWLEDGE_NOT_FOUND", "查無知識資料", HttpStatus.NOT_FOUND);
         }
         KnowledgeResponse knowledgeResponse = KnowledgeResponse.builder()
             .id(knowledge.getKnowledgeId())
@@ -57,7 +58,7 @@ public class KnowledgeController {
             List<String> existingIds = existingKnowledge.stream()
                     .map(Knowledge::getKnowledgeId)
                     .collect(Collectors.toList());
-            return new ResponseEntity<>(ApiResponse.error("entity error", "以下知識 ID 已存在: " + String.join(", ", existingIds)), HttpStatus.UNPROCESSABLE_ENTITY);
+            throw new BusinessException("ENTITY_ERROR", "以下知識 ID 已存在: " + String.join(", ", existingIds), HttpStatus.UNPROCESSABLE_ENTITY);
         }
 
         // 將 KnowledgeRequest 轉換為 Knowledge 物件
@@ -72,11 +73,7 @@ public class KnowledgeController {
                 .collect(Collectors.toList());
 
         // 批量儲存
-        try {
-            knowledgeRepository.saveAll(knowledges);
-            return new ResponseEntity<>(ApiResponse.success(), HttpStatus.CREATED);
-        } catch (Exception e) {
-            return new ResponseEntity<>(ApiResponse.error("server error", e.getMessage()), HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        knowledgeRepository.saveAll(knowledges);
+        return new ResponseEntity<>(ApiResponse.success(), HttpStatus.CREATED);
     }
 }
