@@ -21,6 +21,13 @@ spring:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
     show-sql: true
+# grok:
+#   api:
+#     key: ${GROK_API_KEY}
+#     url: ${GROK_API_URL:https://api.x.ai/v1/chat/completions}
+vectordb:
+  host: ${VECTORDB_HOST:localhost}
+  port: ${VECTORDB_PORT:50051}
 #logging: #debug
  # level:
   #  org.springframework: DEBUG

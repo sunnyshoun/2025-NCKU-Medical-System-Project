@@ -17,10 +17,10 @@ import jakarta.validation.Valid;
 /**
  * ChatController 處理 RAG 聊天功能。
  * 每個使用者同時僅有一個對話。
- * 路徑：/api/v1/chat
+ * 路徑：/api/chat
  */
 @RestController
-@RequestMapping("/api/v1/chat")
+@RequestMapping("/api/chat")
 public class ChatController {
 
     @Autowired
@@ -28,7 +28,7 @@ public class ChatController {
 
     /**
      * 發送聊天訊息並獲取 RAG 回應。
-     * Endpoint: POST /api/v1/chat
+     * Endpoint: POST /api/chat
      * 需要 JWT Token
      */
     @PostMapping
@@ -40,7 +40,7 @@ public class ChatController {
 
     /**
      * 刪除當前使用者的對話。
-     * Endpoint: DELETE /api/v1/chat
+     * Endpoint: DELETE /api/chat
      * 需要 JWT Token
      */
     @DeleteMapping
