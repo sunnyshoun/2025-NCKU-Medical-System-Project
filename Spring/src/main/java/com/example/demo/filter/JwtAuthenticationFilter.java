@@ -62,7 +62,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     ? SecurityConstants.REFRESH_TOKEN_TYPE
                     : SecurityConstants.ACCESS_TOKEN_TYPE;
             String tokenType = jwtTokenUtils.extractTokenType(jwt);
-            System.out.println(tokenType);
             // 檢查 token 類型
             if (!requiredTokenType.equals(tokenType)) {
                 setErrorResponse(response, JwtErrorHandler.handleInvalidTokenTypeError());
@@ -70,8 +69,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             }
 
             // 驗證 token
-            String userId = jwtTokenUtils.extractUserId(jwt);
-            System.out.println(userId);
+            jwtTokenUtils.extractUserId(jwt);
+            
             // 查找用戶
             User user = userRepository.findById(jwtTokenUtils.extractUserIdAsUUID(jwt))
                     .orElseThrow(() -> new IllegalArgumentException("用戶不存在"));
@@ -90,7 +89,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             filterChain.doFilter(request, response);
         } 
         catch (ExpiredJwtException | MalformedJwtException | SecurityException | IllegalArgumentException e) {
-            System.out.println(e);
             setErrorResponse(response, JwtErrorHandler.handleJwtError(e));
         }
     }

@@ -15,7 +15,7 @@ public interface RecordRepository extends JpaRepository<Record, Long> {
 
     List<Record> findByUserId(UUID userId);
 
-    Optional<Record> findByUserIdAndRecordId(UUID userId, Long recordId);
+    Optional<Record> findByUserIdAndRecordId(UUID userId, UUID recordId);
 
     List<Record> findByUserIdAndCreatedAtBetween(UUID userId, LocalDateTime start, LocalDateTime end);
 }

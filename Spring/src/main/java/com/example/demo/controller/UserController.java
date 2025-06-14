@@ -1,6 +1,8 @@
 package com.example.demo.controller;
 
 import com.example.demo.dto.ApiResponse;
+import com.example.demo.dto.RecordRequest;
+import com.example.demo.dto.RecordResponse;
 import com.example.demo.dto.UserProfileRequest;
 import com.example.demo.dto.UserProfileResponse;
 import com.example.demo.model.User;
@@ -11,10 +13,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.validation.Valid;
+
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -31,9 +34,6 @@ public class UserController {
     private UserRepository userRepository;
 
     @Autowired
-    private PasswordEncoder passwordEncoder;
-
-    @Autowired
     private RecordService recordService;
 
     /**
@@ -44,13 +44,12 @@ public class UserController {
     @GetMapping("/profile")
     public ResponseEntity<ApiResponse<UserProfileResponse>> getUserProfile(@AuthenticationPrincipal User currentUser) {
         UserProfileResponse responseData = UserProfileResponse.builder()
-                .id(currentUser.getId())
-                .username(currentUser.getUsername())
-                .email(currentUser.getEmail())
-                .age(currentUser.getAge())
-                .gender(currentUser.getGender())
-                .job(currentUser.getOccupation())
-                .build();
+            .username(currentUser.getUsername())
+            .email(currentUser.getEmail())
+            .age(currentUser.getAge())
+            .gender(currentUser.getGender())
+            .job(currentUser.getOccupation())
+            .build();
 
         return new ResponseEntity<>(ApiResponse.success(responseData), HttpStatus.OK);
     }
@@ -61,7 +60,7 @@ public class UserController {
      * 需要 JWT Token
      */
     @PutMapping("/profile")
-    public ResponseEntity<ApiResponse<UserProfileResponse>> updateUserProfile(@Valid @RequestBody UserProfileRequest profileRequest,
+    public ResponseEntity<ApiResponse<Void>> updateUserProfile(@Valid @RequestBody UserProfileRequest profileRequest,
                                                                              @AuthenticationPrincipal User currentUser) {
         try {
             Optional<User> userOptional = userRepository.findById(currentUser.getId());
@@ -72,9 +71,6 @@ public class UserController {
 
             userToUpdate.setUsername(profileRequest.getUsername());
             userToUpdate.setEmail(profileRequest.getEmail());
-            if (profileRequest.getPassword() != null && !profileRequest.getPassword().isEmpty()) {
-                userToUpdate.setPassword(passwordEncoder.encode(profileRequest.getPassword()));
-            }
             userToUpdate.setAge(profileRequest.getAge());
             userToUpdate.setGender(profileRequest.getGender());
             userToUpdate.setOccupation(profileRequest.getJob());
@@ -95,10 +91,29 @@ public class UserController {
      * 需要 JWT Token
      */
     @GetMapping("/records")
-    public ResponseEntity<List<Record>> getUserRecords(@AuthenticationPrincipal User currentUser) {
+    public ResponseEntity<ApiResponse<List<RecordResponse>>> getUserRecords(@AuthenticationPrincipal User currentUser) {
         UUID userId = currentUser.getId();
         List<Record> records = recordService.getRecordsByUserId(userId);
-        return new ResponseEntity<>(records, HttpStatus.OK);
+
+        List<RecordResponse> recordResponses = new ArrayList<>();
+        for (Record record : records) {
+            recordResponses.add(
+                RecordResponse.builder()
+                .user_id(record.getUserId())
+                .record_id(record.getRecordId())
+                .corr_l(record.getCorrL())
+                .corr_r(record.getCorrR())
+                .diopter_l(record.getDiopterL())
+                .diopter_r(record.getDiopterR())
+                .unco_l(record.getUncoL())
+                .unco_r(record.getUncoR())
+                .created_at(record.getCreatedAt())
+                .updated_at(record.getUpdatedAt())
+                .build()
+            );
+        }
+        
+        return new ResponseEntity<>(ApiResponse.success(recordResponses), HttpStatus.OK);
     }
 
     /**
@@ -107,9 +122,20 @@ public class UserController {
      * 需要JWT Token
      */
     @PostMapping("/records")
-    public ResponseEntity<Record> createRecord(@Valid @RequestBody Record record, @AuthenticationPrincipal User currentUser) {
-        record.setUserId(currentUser.getId());
-        Record savedRecord = recordService.saveRecord(record);
-        return new ResponseEntity<>(savedRecord, HttpStatus.CREATED);
+    public ResponseEntity<ApiResponse<Void>> createRecord(@Valid @RequestBody RecordRequest recordRequest, @AuthenticationPrincipal User currentUser) {
+        Record record = Record.builder()
+            .userId(currentUser.getId())
+            .uncoL(recordRequest.getUnco_l())
+            .uncoR(recordRequest.getUnco_r())
+            .corrL(recordRequest.getCorr_l())
+            .corrR(recordRequest.getCorr_r())
+            .diopterL(recordRequest.getDiopter_l())
+            .diopterR(recordRequest.getDiopter_l())
+            .createdAt(recordRequest.getCreated_at())
+            .updatedAt(recordRequest.getCreated_at())
+            .build();
+
+        recordService.saveRecord(record);
+        return new ResponseEntity<>(ApiResponse.success(), HttpStatus.CREATED);
     }
 }

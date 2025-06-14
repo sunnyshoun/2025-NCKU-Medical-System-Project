@@ -12,7 +12,7 @@ public class KnowledgeRequest {
     private String id;
 
     @NotBlank(message = "Knowledge point cannot be empty")
-    private String knowledgePoint;
+    private String knowledge_point;
 
     @NotNull(message = "Tags cannot be null")
     @Size(min = 1, message = "At least one tag is required")

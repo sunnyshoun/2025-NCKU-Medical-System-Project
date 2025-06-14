@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -13,12 +14,13 @@ import java.util.UUID;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class Record {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "record_id")
-    private Long recordId;
+    @Column(name = "record_id", columnDefinition = "UUID DEFAULT gen_random_uuid()")
+    private UUID recordId;
 
     @Column(name = "user_id", nullable = false)
     private UUID userId;

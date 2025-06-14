@@ -36,7 +36,7 @@ public class User implements UserDetails {
     private String email;
 
     @Column(nullable = true)
-    private String age;
+    private int age;
 
     @Column(nullable = true)
     private String gender;

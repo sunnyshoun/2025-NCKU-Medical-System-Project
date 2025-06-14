@@ -1,5 +1,7 @@
 package com.example.demo.dto;
 
+import org.hibernate.validator.constraints.Range;
+
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -19,8 +21,9 @@ public class RegisterRequest {
     @Email(message = "Email must be valid")
     private String email;
 
-    // 選填
-    private String age;
+    @Range(min = 1, max = 110, message = "Age must be between 1 and 110")
+    private Integer age;
+    
     private String gender;
     private String job;
 }

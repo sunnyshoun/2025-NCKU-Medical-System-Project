@@ -3,6 +3,8 @@ package com.example.demo.controller;
 import com.example.demo.dto.ApiResponse;
 import com.example.demo.dto.KnowledgeRequest;
 import com.example.demo.dto.KnowledgeRequestWrapper;
+import com.example.demo.dto.KnowledgeResponse;
+import com.example.demo.dto.UserProfileResponse;
 import com.example.demo.model.Knowledge;
 import com.example.demo.repository.KnowledgeRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,12 +28,20 @@ public class KnowledgeController {
     private KnowledgeRepository knowledgeRepository;
 
     @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<Knowledge>> getKnowledgeById(@PathVariable String id) {
+    public ResponseEntity<ApiResponse<KnowledgeResponse>> getKnowledgeById(@PathVariable String id) {
         Knowledge knowledge = knowledgeRepository.findByKnowledgeId(id);
         if (knowledge == null) {
             return new ResponseEntity<>(ApiResponse.error("查無知識資料"), HttpStatus.NOT_FOUND);
         }
-        return new ResponseEntity<>(ApiResponse.success(knowledge), HttpStatus.OK);
+        KnowledgeResponse knowledgeResponse = KnowledgeResponse.builder()
+            .id(knowledge.getKnowledgeId())
+            .knowledge_point(knowledge.getKnowledgePoint())
+            .tags(knowledge.getTags())
+            .summary(knowledge.getSummary())
+            .source(knowledge.getSource())
+            .build();
+
+        return new ResponseEntity<>(ApiResponse.success(knowledgeResponse), HttpStatus.OK);
     }
 
     @PostMapping
@@ -55,7 +65,7 @@ public class KnowledgeController {
         List<Knowledge> knowledges = requests.stream()
                 .map(req -> new Knowledge(
                         req.getId(),
-                        req.getKnowledgePoint(),
+                        req.getKnowledge_point(),
                         req.getTags(),
                         req.getSummary(),
                         req.getSource()

@@ -112,7 +112,7 @@ public class AuthController {
             }
 
             authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(accountIdentifier, loginRequest.getPassword())
+                new UsernamePasswordAuthenticationToken(accountIdentifier, loginRequest.getPassword())
             );
 
             String accessToken = jwtTokenUtil.generateAccessToken(user.getId());
