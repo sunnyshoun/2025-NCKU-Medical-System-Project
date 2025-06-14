@@ -65,6 +65,13 @@ public class UserController {
         User userToUpdate = userRepository.findById(currentUser.getId())
             .orElseThrow(() -> new BusinessException("USER_NOT_FOUND", "查無用戶", HttpStatus.NOT_FOUND));
 
+        if (userRepository.findByUsername(profileRequest.getUsername()).isPresent()) {
+            throw new BusinessException("USERNAME_EXISTS", "用戶名已存在", HttpStatus.CONFLICT);
+        }
+        if (userRepository.findByEmail(profileRequest.getEmail()).isPresent()) {
+            throw new BusinessException("EMAIL_EXISTS", "電子郵件已存在", HttpStatus.CONFLICT);
+        }
+
         userToUpdate.setUsername(profileRequest.getUsername());
         userToUpdate.setEmail(profileRequest.getEmail());
         userToUpdate.setAge(profileRequest.getAge());
