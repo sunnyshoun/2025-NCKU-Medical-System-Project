@@ -4,7 +4,6 @@ import com.example.demo.dto.ApiResponse;
 import com.example.demo.dto.KnowledgeRequest;
 import com.example.demo.dto.KnowledgeRequestWrapper;
 import com.example.demo.dto.KnowledgeResponse;
-import com.example.demo.dto.UserProfileResponse;
 import com.example.demo.model.Knowledge;
 import com.example.demo.repository.KnowledgeRepository;
 import org.springframework.beans.factory.annotation.Autowired;
