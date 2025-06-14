@@ -337,3 +337,40 @@
     "data": null
 }
 ```
+
+## ChatController
+
+### POST /api/chat
+**描述**: 發送訊息給 ChatBot，回傳 RAG 後的結果。
+
+**Request Header**:
+```json
+{
+    "Authorization": "Bearer ..."
+}
+```
+
+**Request Body**:
+```json
+{
+    "content": "..." // 1000 個字元內
+}
+```
+
+**Response**:
+- **200 OK**:
+```json
+{
+    "status": "success",
+    "message": "",
+    "data": {
+        "content": "bot reply content...",
+        "tags": [
+            "tag1",
+            "tag2",
+            ...
+        ],
+        "source": "source url"
+    }
+}
+```

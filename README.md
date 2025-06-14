@@ -16,14 +16,42 @@
 
 ```mermaid
 graph TD
-    A[Flutter APP] -->|資料請求/詢問| B[Main Server<br>Java Spring Boot]
-    B -->|存取資料| C[PostgreSQL<br>使用者資料 / 知識資料]
-    C -->|回傳資料| B
-    B -->|RAG: 問題向量化<br>查詢知識 ID| D[Python VectorDB Server]
-    D -->|RAG: 返回知識 ID<br>相關知識點| B
-    B -->|RAG: 檢索結果 + 問題| E[xAI API]
-    E -->|生成回應| B
-    B -->|回應請求/LLM結果| A
+    %% 前端層
+    subgraph Frontend [前端層]
+        A[Flutter App<br>視力測試介面 + 聊天機器人]
+    end
+
+    %% 後端層
+    subgraph Backend [後端層]
+        B[Java Spring Boot<br>Main Server]
+        subgraph External [外部服務]
+            E[xAI API<br>Grok-beta]
+        end
+        subgraph Data [資料層]
+            C[PostgreSQL<br>使用者資料 / 知識資料]
+            D[Python VectorDB Server<br>FAISS + Sentence Transformers]
+        end
+    end
+
+    %% 硬體層
+    subgraph Hardware [硬體層]
+        F[Raspberry Pi<br>視力檢測機器人]
+        G[Arduino<br>馬達控制]
+    end
+
+    %% 資料流
+    A -->|Bluetooth: 操控指令| F
+    F -->|Bluetooth: 測試結果| A
+    A -->|REST: 資料請求/問題| B
+    B -->|JDBC: 存取資料| C
+    C -->|JDBC: 回傳資料| B
+    B -->|REST: 問題向量化| D
+    D -->|REST: 返回知識 ID| B
+    B -->|REST: RAG + 問題| E
+    E -->|REST: 生成回應| B
+    B -->|REST: 回應| A
+    F -->|Serial Port: 馬達控制指令| G
+    G -->|Serial Port: 感測器資料| F
 ```
 
 ## 組件概述
@@ -60,11 +88,11 @@ graph TD
 ### 前置條件
 - **硬體**：Raspberry Pi 4 Model B、Arduino Uno、穩定的網路連線。
 - **軟體**：
-  - Python 3.10+（Rpi、VectorDB）
-  - Java 17+（Spring）
+  - Python 3.11+（Rpi、VectorDB）
+  - Java 21+（Spring）
   - Flutter SDK（Flutter）
   - Arduino IDE（Arduino）
-  - PostgreSQL 15+（資料庫）
+  - PostgreSQL 16+（資料庫）
 - **外部服務**：xAI API 金鑰（參見 [xAI API 文件](https://x.ai/api)）。
 
 ### 安裝步驟
