@@ -14,6 +14,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.validation.Valid;
@@ -70,6 +71,9 @@ public class UserController {
         }
         if (userRepository.findByEmail(profileRequest.getEmail()).isPresent()) {
             throw new BusinessException("EMAIL_EXISTS", "電子郵件已存在", HttpStatus.CONFLICT);
+        }
+        if (profileRequest.getAge() != null && (profileRequest.getAge() < 1 || profileRequest.getAge() > 110)) {
+            throw new BusinessException("INVALID_AGE", "年齡要在1到110歲之間", HttpStatus.BAD_REQUEST);
         }
 
         userToUpdate.setUsername(profileRequest.getUsername());
