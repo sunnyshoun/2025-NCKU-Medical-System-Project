@@ -76,16 +76,20 @@ curl -X GET "http://localhost:8000/v1/knowledge?query=SMILE雷射手術全名是
 - **Response Body**：
   ```json
   {
-    "results": [
-      {
-        "rank": "integer",
-        "id": "string",
-        "similarity": "float"
-      },
-      ...
-    ],
-    "total": "integer",
-    "query": "string"
+    "status": "success",
+    "message": "Search completed successfully",
+    "data":{
+      "results": [
+        {
+          "rank": "integer",
+          "id": "string",
+          "similarity": "float"
+        },
+        ...
+      ],
+      "total": "integer",
+      "query": "string"
+    }
   }
   ```
   - **results**：搜尋結果列表
@@ -98,27 +102,51 @@ curl -X GET "http://localhost:8000/v1/knowledge?query=SMILE雷射手術全名是
 #### 範例回應
 ```json
 {
-  "results": [
-    {"rank": 1, "id": "57fb4f3c-c544-4465-9ef4-a53e3c7df1d7", "similarity": 0.95},
-    {"rank": 2, "id": "c947d930-f8c6-4a77-9e6f-65e1d4249978", "similarity": 0.92},
-    {"rank": 3, "id": "e5431414-8030-4463-bdb9-961393cdc53a", "similarity": 0.88},
-    {"rank": 4, "id": "b5a38db3-6a5b-4334-85fa-4c1b9f04f425", "similarity": 0.85},
-    {"rank": 5, "id": "547116a6-c37f-450d-9a54-795ea2df70a8", "similarity": 0.82}
-  ],
-  "total": 5,
-  "query": "SMILE雷射手術全名是什麼?"
+  "status": "success",
+  "message": "Search completed successfully",
+  "data": {
+    "results": [
+      {
+        "rank": 1,
+        "id": "117239c6-483b-4d7a-a539-5131e51073d3",
+        "similarity": 0.8952757120132446
+      },
+      {
+        "rank": 2,
+        "id": "b489eb14-da61-4521-bb74-1350851dbc31",
+        "similarity": 0.8832905888557434
+      },
+      {
+        "rank": 3,
+        "id": "faf47954-361c-4aee-b365-41e0432654e4",
+        "similarity": 0.8779246807098389
+      },
+      {
+        "rank": 4,
+        "id": "637555f6-f816-43f4-984f-752e66f70002",
+        "similarity": 0.8689804077148438
+      },
+      {
+        "rank": 5,
+        "id": "3930def6-d92f-4e75-92fd-a4bb330dd558",
+        "similarity": 0.8653693199157715
+      }
+    ],
+    "total": 5,
+    "query": "SMILE飛秒雷射是什麼"
+  }
 }
 ```
 
 #### 錯誤回應
-- **Status Code**：`400 Bad Request`
+- **Status Code**：`422Unprocessable Entity`
   - **說明**：查詢無效，例如 query 為空
   - **Response Body**：
     ```json
     {
-      "status": "error",
-      "message": "查詢無效",
-      "detail": "查詢文本不能為空"
+        "status": "無效的請求格式",
+        "message": "query: Field required",
+        "data": null
     }
     ```
 - **Status Code**：`500 Internal Server Error`
@@ -126,9 +154,9 @@ curl -X GET "http://localhost:8000/v1/knowledge?query=SMILE雷射手術全名是
   - **Response Body**：
     ```json
     {
-      "status": "error",
-      "message": "搜尋時發生錯誤",
-      "detail": "具體錯誤描述"
+      "status": "搜尋時發生錯誤",
+      "message": "具體錯誤描述",
+      "data": null
     }
     ```
 
@@ -185,7 +213,14 @@ curl -X POST "http://localhost:8000/v1/knowledge" \
   ```json
   {
     "status": "success",
-    "message": "知識資料新增成功"
+    "message": "知識資料新增成功",
+    "data": {
+      "new_ids": [
+        "id_1",
+        "id_2",
+        ...
+      ]
+    }
   }
   ```
 
@@ -195,9 +230,9 @@ curl -X POST "http://localhost:8000/v1/knowledge" \
   - **Response Body**：
     ```json
     {
-      "status": "error",
-      "message": "無效的知識資料",
-      "detail": "知識 '57fb4f3c-c544-4465-9ef4-a53e3c7df1d7' 的 knowledge_point 不可為空"
+      "status": "無效的知識資料",
+      "message": "知識 '57fb4f3c-c544-4465-9ef4-a53e3c7df1d7' 的 knowledge_point 不可為空",
+      "data": null
     }
     ```
 - **Status Code**：`500 Internal Server Error`
@@ -205,9 +240,9 @@ curl -X POST "http://localhost:8000/v1/knowledge" \
   - **Response Body**：
     ```json
     {
-      "status": "error",
-      "message": "新增知識資料時發生錯誤",
-      "detail": "具體錯誤描述"
+      "status": "新增知識資料時發生錯誤",
+      "message": "具體錯誤描述",
+      "data": null
     }
     ```
 
