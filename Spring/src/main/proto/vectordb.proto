@@ -1,0 +1,47 @@
+syntax = "proto3";
+
+package com.example.demo.vectordb;
+
+option java_package = "com.example.demo.vectordb";
+option java_multiple_files = true;
+option java_outer_classname = "VectorDbProto";
+
+service VectorDBService {
+  rpc SearchKnowledge (SearchRequest) returns (SearchResponse);
+  rpc AppendKnowledge (AppendRequest) returns (AppendResponse);
+}
+
+message SearchRequest {
+  string query = 1;
+  int32 top_k = 2;
+}
+
+message SearchResult {
+  int32 rank = 1;
+  string id = 2;
+  float similarity = 3;
+}
+
+message SearchResponse {
+  string status = 1;
+  string message = 2;
+  repeated SearchResult results = 3;
+}
+
+message KnowledgeData {
+  string id = 1;
+  string knowledge_point = 2;
+  repeated string tags = 3;
+  string summary = 4;
+  string source = 5;
+}
+
+message AppendRequest {
+  repeated KnowledgeData knowledges = 1;
+}
+
+message AppendResponse {
+  string status = 1;
+  string message = 2;
+  repeated string new_ids = 3;
+}
