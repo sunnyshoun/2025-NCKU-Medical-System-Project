@@ -29,8 +29,8 @@
     "status": "success",
     "message": "註冊成功",
     "data": {
-        "accessToken": "...",
-        "refreshToken": "..."
+        "access_token": "...",
+        "refresh_token": "..."
     }
 }
 ```
