@@ -14,24 +14,44 @@ services:
     entrypoint: ["/bin/bash", "/docker-entrypoint-initdb.d/pg-entrypoint.sh"]
     networks:
       - net
-# <-- 新增：Spring Boot 應用程式服務
-  spring-app: # 服務名稱，其他 Docker 容器可以通過這個名稱訪問它 (例如 postgres:5432)
-    container_name: spring-server # Spring Boot 容器的名稱
-    build: . # <-- 關鍵：告訴 Docker Compose 在當前目錄查找 Dockerfile 來構建映像檔
-    ports: # 埠號映射：將主機的 8080 埠映射到容器的 8080 埠
-      - "8080:8080"
-    depends_on: # <-- 關鍵：確保 postgres 服務在 spring-app 啟動前已經運行
+
+  base-service:
+    build:
+      context: ./vectordb
+      dockerfile: Dockerfile.base
+    image: vectordb-base
+
+  vectordb:
+    container_name: vectordb-server
+    build: ./vectordb
+    volumes:
+      - ./vectordb/scripts:/vectordb/scripts
+      - ./vectordb/data:/vectordb/data
+      - ./vectordb/models:/vectordb/models
+    depends_on:
+      - base-service
       - postgres
-    environment: # 設定 Spring Boot 應用程式的環境變數
-      # Spring Boot 會讀取這些環境變數，並覆蓋 application.yml 中的同名設定
-      # 這裡用來確保 Docker 環境下資料庫連接資訊的正確性
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/postgres # <-- 資料庫 URL，指向 'postgres' 服務和 'postgres' 資料庫
+    networks:
+      - net
+    restart: unless-stopped
+
+  spring-app: #
+    container_name: spring-server
+    build: .
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+      - vectordb
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/postgres
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: mysecretpassword
-      # 如果你還有其他 Spring Boot 配置需要從環境變數中讀取，可以在這裡添加
-    networks: # 連接到相同的網路，以便與 postgres 容器通信
+      VECTORDB_HOST: vectordb
+      VECTORDB_PORT: 50051
+    networks:
       - net
-    restart: unless-stopped # 容器停止後自動重啟
+    restart: unless-stopped
     
 networks:
   net:

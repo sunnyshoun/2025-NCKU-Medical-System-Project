@@ -21,13 +21,28 @@ spring:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
     show-sql: true
-# grok:
-#   api:
-#     key: ${GROK_API_KEY}
-#     url: ${GROK_API_URL:https://api.x.ai/v1/chat/completions}
+grpc:
+  server:
+    security:
+      enabled: false
+grok:
+  api:
+    key: ${GROK_API_KEY:your_xai_key}
+    url: ${GROK_API_URL:https://api.x.ai/v1/chat/completions}
+  search:
+    enabled: true
+    mode: auto
+    return-citations: true
+  model: ${GROK_MODEL:grok-3-latest}
+chat:
+  context:
+    max-messages: ${CHAT_MAX_MESSAGES:20}
+  vector-search:
+    top-k: ${VECTOR_SEARCH_TOP_K:5}
 vectordb:
-  host: ${VECTORDB_HOST:localhost}
+  host: ${VECTORDB_HOST:vectordb}
   port: ${VECTORDB_PORT:50051}
+
 #logging: #debug
  # level:
   #  org.springframework: DEBUG

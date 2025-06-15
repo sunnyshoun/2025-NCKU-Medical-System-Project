@@ -353,7 +353,7 @@
 **Request Body**:
 ```json
 {
-    "content": "..." // 1000 個字元內
+    "content": "..." // 300 個字元內
 }
 ```
 
@@ -370,7 +370,40 @@
             "tag2",
             ...
         ],
-        "source": "source url"
+        "source": [
+            "url1",
+            "url2",
+            ...
+        ]
     }
+}
+```
+
+### DELETE /api/chat
+**描述**: 結束對話，刪除使用者紀錄的上下文
+
+**Request Header**:
+```json
+{
+    "Authorization": "Bearer ..."
+}
+```
+
+**Request Body**: 無
+
+- **200 OK**:
+```json
+{
+    "status": "success",
+    "message": "",
+    "data": null
+}
+```
+- **404 Not Found** (對話不存在):
+```json
+{
+    "status": "CONVERSATION_NOT_FOUND",
+    "message": "對話不存在",
+    "data": null
 }
 ```
