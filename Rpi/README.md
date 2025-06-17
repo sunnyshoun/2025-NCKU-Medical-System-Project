@@ -1,18 +1,17 @@
 # Raspberry Pi 組件
 
 ## 概述
-本組件運行於 Raspberry Pi，負責控制視力檢測機器人，支援語音交互（錄製與播放）、藍牙連線、OLED 顯示和按鈕輸入。視力測試結果通過藍牙傳送至 Flutter App，再由手機 透過網路傳送至 Spring 後端，儲存於 PostgreSQL 資料庫。
+本組件運行於 Raspberry Pi，負責控制視力檢測機器人，支援語音交互（錄製與播放）、藍牙連線、OLED 顯示和按鈕輸入，支援選單連線藍芽耳機，利用藍芽耳機做視力檢測，也可連線手機App，將視力測試結果通過藍牙傳送至 Flutter App，再由手機 透過網路傳送至 Spring 後端，儲存於 PostgreSQL 資料庫。
 
 ## 硬體需求
-- Raspberry Pi 4 Model B
-- 麥克風與揚聲器（語音錄製與播放）
-- 藍牙模組（與 Flutter 應用或 Arduino 通訊）
+- Raspberry Pi 3B+ 或 以上
 - OLED 顯示器（顯示視力測試圖像）
 - 按鈕（選單操作）
-- （可選）超音波感測器或馬達（輔助定位）
+- 超音波感測器
+- 馬達
 
 ## 軟體依賴
-- Python 3.10+
+- Python 3.11+
 - 必要庫（見 `requirements.txt`）：
   - `RPi.GPIO`：硬體控制
   - `speech_recognition`、`pyaudio`：語音處理
@@ -143,5 +142,5 @@ flowchart TD
 ## 注意事項
 - 確保 GPIO 腳位與 `config.json` 配置一致。
 - 語音檔案（`src/audio/audioFiles/`）需支援多語言（en、jp、tw、zh）。
-- 藍牙連線需穩定，避免中斷影響選單操作。
+- 藍牙連線需穩定，避免中斷影響測試過程或手機連線。
 - 視力測試需確保 OLED 顯示器正常運作，測試結果通過藍牙或網路傳至 Spring 後端。

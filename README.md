@@ -86,7 +86,7 @@ graph TD
 ## 設置與運行
 
 ### 前置條件
-- **硬體**：Raspberry Pi 3B+、Arduino Uno、穩定的網路連線。
+- **硬體**：Raspberry Pi 3B+ 或 更以上、Arduino Uno、穩定的網路連線。
 - **軟體**：
   - Python 3.11+（Rpi、VectorDB）
   - Java 21+（Spring）
