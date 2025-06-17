@@ -8,7 +8,7 @@
 - **視力檢測**：由 Raspberry Pi 和 Arduino 控制的機器人執行視力測試，結果顯示於機器人螢幕與 Flutter 應用並上傳至後端。
 - **聊天機器人**：Flutter 應用提供多語言聊天介面，回答眼科相關問題和衛教資訊。
 - **資料管理**：PostgreSQL 儲存使用者資料和知識庫，向量資料庫（VectorDB）支援語義搜尋。
-- **RAG 流程**：Spring 查詢 VectorDB 得到知識點 ID ，接下來從 ：PostgreSQL 找到對應的知識點後結合 xAI API 生成回應。
+- **RAG 流程**：Spring 查詢 VectorDB 得到知識點 ID ，接下來從 ：PostgreSQL 找到對應的知識點後結合用戶資訊使用 xAI API 生成回應。
 
 ## 全端架構圖
 
@@ -45,8 +45,8 @@ graph TD
     A -->|REST: 資料請求/問題| B
     B -->|JDBC: 存取資料| C
     C -->|JDBC: 回傳資料| B
-    B -->|REST: 問題向量化| D
-    D -->|REST: 返回知識 ID| B
+    B -->|gRPC: 問題向量化| D
+    D -->|gRPC: 返回知識 ID| B
     B -->|REST: RAG + 問題| E
     E -->|REST: 生成回應| B
     B -->|REST: 回應| A
@@ -68,25 +68,25 @@ graph TD
    - **技術棧**：Arduino C++、感測器庫。  
    - **用途**：執行底盤硬體控制任務。
 
-3. **[VectorDB](./VectorDB/README.md)**  
-   - **功能**：向量資料庫服務，使用 FAISS 和 Sentence Transformers 提供語義搜尋。  
-   - **技術棧**：Python、FastAPI、FAISS、Sentence Transformers。  
-   - **用途**：檢索眼科知識，回傳知識 ID 與關聯度給 Spring 後端。
-
-4. **[Spring](./Spring/README.md)**  
-   - **功能**：主後端服務，處理 Flutter 請求、存取 PostgreSQL、與 VectorDB 和 xAI API 整合。  
-   - **技術棧**：Java、Spring Boot、Maven、PostgreSQL。  
-   - **用途**：協調資料流，管理視力檢測結果和聊天機器人回應。
-
-5. **[Flutter](./Flutter/README.md)**  
+3. **[App](./App/README.md)**  
    - **功能**：手機前端應用，提供視力測試介面和聊天機器人功能。  
    - **技術棧**：Dart、Flutter。  
    - **用途**：與使用者交互，顯示測試結果並發送問題至後端。
 
+4. **[Backend](./Backend/README.md)**  
+   - **功能**：主後端服務，處理 Flutter 請求、存取 PostgreSQL、與 VectorDB 和 xAI API 整合。  
+   - **技術棧**：Java、Spring Boot、Maven、PostgreSQL。  
+   - **用途**：協調資料流，管理視力檢測結果和聊天機器人回應。
+
+5. **[Backend/VectorDB](./Backend/VectorDB/README.md)**  
+   - **功能**：向量資料庫服務，使用 FAISS 和 Sentence Transformers 提供語義搜尋。  
+   - **技術棧**：Python、gRPC、FAISS、Sentence Transformers。  
+   - **用途**：檢索眼科知識，回傳知識 ID 與關聯度給 Spring 後端。
+
 ## 設置與運行
 
 ### 前置條件
-- **硬體**：Raspberry Pi 4 Model B、Arduino Uno、穩定的網路連線。
+- **硬體**：Raspberry Pi 3B+、Arduino Uno、穩定的網路連線。
 - **軟體**：
   - Python 3.11+（Rpi、VectorDB）
   - Java 21+（Spring）
@@ -107,16 +107,15 @@ graph TD
 
 3. **啟動服務**：
    - **Rpi**：運行 `Rpi/src/main.py`。
-   - **VectorDB**：運行 `uvicorn VectorDB/app.main:app --host 0.0.0.0 --port 8000`。
-   - **Spring**：運行 `mvn spring-boot:run`。
+   - **Backend**：運行 `docker-compose up -d`
    - **Flutter**：運行 `flutter run`。
    - **Arduino**：燒錄程式碼至設備（參見 `Arduino/README.md`）。
 
 ## 注意事項
-- 確保各組件的配置文件（例如 `Rpi/config.json`、`Spring/application.properties`）正確設置。
-- VectorDB 服務的 FAISS 索引需定期更新，參見 `VectorDB/scripts/vector_embedding.py`。
+- 確保各組件的配置文件（例如 `Rpi/config.json`、`Spring 的 application.yml`）正確設置。
 - xAI API 使用需遵守配額限制，詳見 [xAI API 文件](https://docs.x.ai/docs/overview)。
-- 硬體組件（Rpi、Arduino）的 GPIO 或序列埠配置需與程式碼一致。
+- 硬體組件（Rpi、Arduino）的 GPIO 或序列埠配置需與程式碼一致
+- 專案路徑請勿包含中文、空格、特殊字元等
 
 ## 聯繫與支援
 如有問題或需要擴展功能（例如新增 API 端點、優化硬體交互），請聯繫專案維護者或提交 issue 至版本控制庫。
