@@ -1,0 +1,58 @@
+services:
+  postgres:
+    container_name: pg-server
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: mysecretpassword
+    volumes:
+      - ./PostgreSQL/backups:/backups
+      - ./PostgreSQL/config/postgresql.conf:/etc/postgresql/postgresql.conf
+      - ./PostgreSQL/config/:/etc/postgresql/
+      - ./PostgreSQL/init:/docker-entrypoint-initdb.d/
+    entrypoint: ["/bin/bash", "/docker-entrypoint-initdb.d/pg-entrypoint.sh"]
+    networks:
+      - net
+
+  base-service:
+    build:
+      context: ./vectordb
+      dockerfile: Dockerfile.base
+    image: vectordb-base
+
+  vectordb:
+    container_name: vectordb-server
+    build: ./vectordb
+    volumes:
+      - ./vectordb/scripts:/vectordb/scripts
+      - ./vectordb/data:/vectordb/data
+      - ./vectordb/models:/vectordb/models
+    depends_on:
+      - base-service
+      - postgres
+    networks:
+      - net
+    restart: unless-stopped
+
+  spring-app: #
+    container_name: spring-server
+    build: .
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+      - vectordb
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/postgres
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: mysecretpassword
+      VECTORDB_HOST: vectordb
+      VECTORDB_PORT: 50051
+    networks:
+      - net
+    restart: unless-stopped
+    
+networks:
+  net:
+    driver: bridge
