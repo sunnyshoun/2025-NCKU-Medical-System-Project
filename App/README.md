@@ -60,7 +60,7 @@ lib/
 1. **複製 repository**
    ```bash
    git clone <repository-url>
-   cd tester_app
+   cd App/tester_app
    ```
 
 2. **安裝相依套件**
@@ -75,7 +75,7 @@ lib/
    static String BASE_DOMAIN = 'your-server-ip:8080';
    ```
 
-4. **執行應用程式**
+**執行應用程式**
    ```bash
    flutter run
    ```
@@ -161,13 +161,6 @@ lib/
 - **http**: API 通訊的 HTTP client
 - **path_provider**: 快取用的本地檔案系統存取
 - **cupertino_icons**: iOS 風格圖示
-
-## 🧪 測試
-
-執行測試：
-```bash
-flutter test
-```
 
 ## 🚀 Production 建置
 
