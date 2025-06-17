@@ -10,9 +10,9 @@ public:
     - /api/auth/verify-email
 spring:
   datasource:
-    username: postgres
-    password: mysecretpassword
-    url: jdbc:postgresql://localhost:5432/postgres
+    username: ${POSTGRES_USER}
+    password: ${POSTGRES_PASSWORD}
+    url: jdbc:postgresql://localhost:5432/${POSTGRES_USER}
   jpa:
     hibernate:
       ddl-auto: update

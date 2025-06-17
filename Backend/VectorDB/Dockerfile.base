@@ -3,15 +3,20 @@ FROM python:3.11-slim
 
 # 安裝系統依賴（FAISS 需要 libgomp1）
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libgomp1 \
+    libgomp1 curl ca-certificates\
     && rm -rf /var/lib/apt/lists/*
+
+# 安裝 uv
+ADD https://astral.sh/uv/install.sh /uv-installer.sh
+RUN sh /uv-installer.sh && rm /uv-installer.sh
+ENV PATH="/root/.local/bin/:$PATH"
 
 # 設定工作目錄
 WORKDIR /vectordb
 
 # 複製並安裝 Python 依賴
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN uv pip install --system --no-cache -r requirements.txt
 
 # 設置環境變數
 ENV PYTHONUNBUFFERED=1 \

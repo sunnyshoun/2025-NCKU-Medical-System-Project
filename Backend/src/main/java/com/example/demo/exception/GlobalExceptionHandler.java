@@ -15,6 +15,8 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.servlet.NoHandlerFoundException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -73,6 +75,26 @@ public class GlobalExceptionHandler {
         );
     }
 
+    // 處理 404 - 找不到處理器
+    @ExceptionHandler(NoHandlerFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleNoHandlerFound(NoHandlerFoundException ex) {
+        logger.warn("No handler found: {} {}", ex.getHttpMethod(), ex.getRequestURL());
+        return new ResponseEntity<>(
+            ApiResponse.error("NOT_FOUND", "找不到請求的資源: " + ex.getHttpMethod() + " " + ex.getRequestURL()),
+            HttpStatus.NOT_FOUND
+        );
+    }
+
+    // 處理 404 - 找不到靜態資源
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleNoResourceFound(NoResourceFoundException ex) {
+        logger.warn("No static resource found: {}", ex.getResourcePath());
+        return new ResponseEntity<>(
+            ApiResponse.error("NOT_FOUND", "找不到靜態資源: " + ex.getResourcePath()),
+            HttpStatus.NOT_FOUND
+        );
+    }
+
     // 處理認證失敗
     @ExceptionHandler(AuthenticationException.class)
     public ResponseEntity<ApiResponse<Void>> handleAuthenticationException(AuthenticationException ex) {
@@ -107,6 +129,15 @@ public class GlobalExceptionHandler {
     // 通用異常處理
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleGenericException(Exception ex) {
+        // 檢查是否為資源找不到的錯誤
+        if (ex.getMessage() != null && ex.getMessage().contains("No static resource")) {
+            logger.warn("Static resource not found: {}", ex.getMessage());
+            return new ResponseEntity<>(
+                ApiResponse.error("NOT_FOUND", "找不到靜態資源"),
+                HttpStatus.NOT_FOUND
+            );
+        }
+        
         logger.error("Unexpected error: {}", ex.getMessage(), ex);
         return new ResponseEntity<>(
             ApiResponse.error("UNKNOWN_ERROR", "未知錯誤: " + ex.getMessage()),
