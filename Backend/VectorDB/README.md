@@ -280,11 +280,11 @@ grpcurl -plaintext -import-path app/proto -proto vector_db.proto -d '{"knowledge
 
 ## 注意事項
 - **FAISS 索引**：確保 `index_cosine.faiss` 與 `scripts/vector_embedding.py` 生成的格式一致。
-- **模型儲存**：確保 `model/multilingual-e5-large/` 包含下載的模型文件，可通過 `scripts/download_model.py` 生成。
+- **模型儲存**：確保 `model/multilingual-e5-large/` 包含下載的模型文件，可通過 `scripts/download_model.py` 下載。
 - **資料庫同步**：執行 `insert_knowledge.py` 後，需運行 `vector_embedding.py` 更新 FAISS 索引，確保向量資料庫與 PostgreSQL 一致。
 - **記憶體需求**：載入 `intfloat/multilingual-e5-large` 模型和 FAISS 索引需要較多記憶體，建議在伺服器環境運行。
 - **協同工作**：本服務需與 SQL 後端配合，確保知識點的 UUID 一致。
 - **資料持久化**：新增知識點後，FAISS 索引和 ID 對應表會自動更新並儲存至 `data/index_cosine.faiss` 和 `data/index_id_mapping.pkl`。
-- **Docker 運行**：確保 `data/` 和 `model/` 目錄已掛載到容器中，以保持資料和模型的持久化。PostgreSQL 環境變數需正確配置。
+- **Docker 運行**：確保 `data/` 目錄已掛載到容器中，以保持資料和模型的持久化。PostgreSQL 環境變數需正確配置。
 - **錯誤處理**：gRPC 服務內建錯誤處理，返回標準化的 `status` 和 `message`。
 - **安全性**：生產環境應啟用 gRPC 的 TLS 認證，並確保 PostgreSQL 連線使用安全憑證。
