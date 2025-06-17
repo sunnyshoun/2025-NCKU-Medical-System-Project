@@ -10,8 +10,5 @@ COPY app/ ./app/
 # 生成 gRPC 代碼，直接輸出到 app/ 目錄
 RUN python -m grpc_tools.protoc -I app/proto --python_out=app --grpc_python_out=app app/proto/vector_db.proto
 
-# 暴露 gRPC 服務的埠
-EXPOSE 50051
-
 # 定義啟動命令
 CMD ["python3", "app/main.py"]
