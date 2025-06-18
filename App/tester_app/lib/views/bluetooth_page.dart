@@ -1,6 +1,9 @@
+import 'dart:developer';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:tester_app/configs/app_localizations.dart';
 import 'package:tester_app/controllers/bluetooth_controller.dart';
 
 class BluetoothPage extends StatefulWidget {
@@ -15,7 +18,17 @@ class _BluetoothPageState extends State<BluetoothPage> {
   @override
   void initState() {
     super.initState();
+    _checkPermissions();
     _initBluetooth();
+  }
+
+  void _checkPermissions() async {
+    await [
+      Permission.location,
+      Permission.bluetoothScan,
+      Permission.bluetoothConnect,
+      Permission.bluetooth,
+    ].request();
   }
 
   void _initBluetooth() async {
@@ -40,19 +53,28 @@ class _BluetoothPageState extends State<BluetoothPage> {
     await FlutterBluePlus.adapterState
         .where((state) => state == BluetoothAdapterState.on)
         .first;
+
+    controller.onListChanged.add(
+      (results) => setState(() {
+        controller.blueStates.scanResults = results;
+      }),
+    );
+    controller.startScan(context);
   }
 
   @override
   Widget build(BuildContext context) {
     final controller = widget.controller;
+    final generalStates = controller.generalStates;
     final blueStates = controller.blueStates;
+    final t = AppLocalizations(generalStates.locale);
 
     if (blueStates.adapterState == BluetoothAdapterState.off) {
       return const Text('藍牙未開啟');
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('藍芽裝置')),
+      appBar: AppBar(title: Text(t.get('connect_bluetooth'))),
       body: ListView.builder(
         itemCount: blueStates.scanResults.length,
         itemBuilder: (context, index) {
@@ -62,6 +84,7 @@ class _BluetoothPageState extends State<BluetoothPage> {
               result.device.platformName.isNotEmpty
                   ? result.device.platformName
                   : result.device.remoteId.toString(),
+              style: TextStyle(fontSize: generalStates.fontSize),
             ),
             subtitle: Text(result.device.advName),
             trailing: Text('${result.rssi} dBm'),
@@ -69,24 +92,13 @@ class _BluetoothPageState extends State<BluetoothPage> {
           );
         },
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed:
-            blueStates.isScanning
-                ? () => setState(() {
-                  controller.stopScan();
-                  blueStates.isScanning = false;
-                })
-                : () => setState(() {
-                  controller.startScan(context);
-                  blueStates.isScanning = true;
-                }),
-        child: Icon(blueStates.isScanning ? Icons.stop : Icons.search),
-      ),
     );
   }
 
   @override
   void dispose() {
+    log('dispose');
+    widget.controller.stopScan();
     widget.controller.blueStates.adapterStateSubscription?.cancel();
     FlutterBluePlus.stopScan();
     super.dispose();

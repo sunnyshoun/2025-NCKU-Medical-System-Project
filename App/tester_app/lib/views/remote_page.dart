@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:tester_app/configs/app_localizations.dart';
+import 'package:tester_app/controllers/bluetooth_controller.dart';
 import 'package:tester_app/models/state_models.dart';
+import 'package:tester_app/views/bluetooth_page.dart';
 
 class RemotePage extends StatefulWidget {
   final GeneralStateModel states;
@@ -21,17 +23,22 @@ class _RemotePageState extends State<RemotePage> {
 
   @override
   Widget build(BuildContext context) {
-    final t = AppLocalizations(widget.states.locale);
-    final fontSize = widget.states.fontSize;
+    final states = widget.states;
+    final t = AppLocalizations(states.locale);
+    final fontSize = states.fontSize;
+
+    if (states.blue == null) {
+      final blueController = BluetoothController(
+        generalStates: states,
+        blueStates: BlueListModel(),
+      );
+      blueController.onConnected.add(() => setState(() {}));
+      return BluetoothPage(controller: blueController);
+    }
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          t.get('remote'), 
-          style: TextStyle(
-            fontSize: fontSize,
-          ),
-        ),
+        title: Text(t.get('remote'), style: TextStyle(fontSize: fontSize)),
         actions: [
           PopupMenuButton<String>(
             onSelected: (value) {},
@@ -52,9 +59,7 @@ class _RemotePageState extends State<RemotePage> {
             padding: const EdgeInsets.all(12),
             child: Text(
               _message,
-              style: TextStyle(
-                fontSize: fontSize,
-                color: Colors.black87),
+              style: TextStyle(fontSize: fontSize, color: Colors.black87),
             ),
           ),
 
@@ -101,6 +106,15 @@ class _RemotePageState extends State<RemotePage> {
                   _DirectionButton(
                     icon: Icons.arrow_drop_down,
                     onTap: () => _updateMessage('下'),
+                  ),
+                  Spacer(),
+                  ElevatedButton.icon(
+                    icon: Icon(Icons.bluetooth),
+                    onPressed:
+                        () => setState(() {
+                          states.blue = null;
+                        }),
+                    label: Text(t.get('diconnect')),
                   ),
                 ],
               ),

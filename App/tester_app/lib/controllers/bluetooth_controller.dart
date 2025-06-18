@@ -9,12 +9,10 @@ import 'package:tester_app/models/state_models.dart';
 class BluetoothController {
   final GeneralStateModel generalStates;
   final BlueListModel blueStates;
-  final List<void Function()> onListChanged = [];
+  final List<void Function(List<ScanResult>)> onListChanged = [];
+  final List<void Function()> onConnected = [];
 
-  BluetoothController({
-    required this.generalStates,
-    required this.blueStates,
-  });
+  BluetoothController({required this.generalStates, required this.blueStates});
 
   void showErr(String message, BuildContext context) => showDialog(
     context: context,
@@ -45,7 +43,7 @@ class BluetoothController {
       await FlutterBluePlus.startScan(timeout: const Duration(seconds: 15));
       FlutterBluePlus.scanResults.listen((results) {
         for (var fn in onListChanged) {
-          fn();
+          fn(results);
         }
       });
     } catch (e) {
@@ -64,6 +62,9 @@ class BluetoothController {
         services: services,
         bluetoothDevice: device,
       );
+      for (var fn in onConnected) {
+        fn();
+      }
     } catch (e) {
       log('連接設備時發生錯誤: $e');
     }
