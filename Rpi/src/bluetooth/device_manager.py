@@ -94,7 +94,6 @@ class PulseAudioManager:
             with Pulse('bluetooth-audio') as pulse:
                 return pulse.get_card_by_name(card_name)
         except PulseError as e:
-            logger.debug(f"未找到卡 {card_name}: {e}")
             return None
         except Exception as e:
             logger.error(f"獲取卡失敗: {e}")
@@ -141,7 +140,6 @@ class PulseAudioManager:
                     logger.error(f"未找到 sink: {sink_name}")
                     return False
                 pulse.sink_default_set(sink)
-                logger.debug(f"成功設置預設 sink: {sink_name}")
                 return True
                 
         except PulseError as e:
@@ -161,7 +159,6 @@ class PulseAudioManager:
                     logger.error(f"未找到 source: {source_name}")
                     return False
                 pulse.source_default_set(source)
-                logger.debug(f"成功設置預設 source: {source_name}")
                 return True
                 
         except PulseError as e:
@@ -269,12 +266,6 @@ class BluetoothInterfaceAsync:
         icon = VariantHelper.extract_string(device_props.get("Icon", ""))
         icon_match = 'audio' in icon.lower()
         
-        logger.debug(
-            f"設備 {name} 檢查結果: "
-            f"class={class_match}({hex(device_class)}), "
-            f"uuid={uuid_match}, name={name_match}, icon={icon_match}"
-        )
-        
         return class_match or uuid_match or name_match or icon_match
     
     async def list_devices(self) -> List[Device]:
@@ -310,8 +301,6 @@ class BluetoothInterfaceAsync:
                     device_name=name,
                     mac_address=address.replace(':', '_')
                 ))
-                
-                logger.debug(f"找到藍牙耳機: {name} ({address}) - {path}")
             
             return devices
             
@@ -345,11 +334,9 @@ class BluetoothInterfaceAsync:
         while time.time() - start_time < timeout:
             prop = await self._get_property(path, BluetoothConstants.DEVICE_INTERFACE, property_name)
             if prop and VariantHelper.extract_value(prop) == expected_value:
-                logger.debug(f"屬性 {property_name} 已變更為 {expected_value}")
                 return True
             await asyncio.sleep(0.2)
         
-        logger.warning(f"等待屬性 {property_name} 變更超時")
         return False
     
     async def _pair_device(self, device_path: str, device_name: str) -> bool:
@@ -360,7 +347,6 @@ class BluetoothInterfaceAsync:
                 device_path, BluetoothConstants.DEVICE_INTERFACE, "Paired"
             )
             if paired_prop and VariantHelper.extract_bool(paired_prop):
-                logger.info(f"設備 {device_name} 已經配對")
                 return True
             
             logger.info(f"開始配對 {device_name}")
@@ -376,7 +362,6 @@ class BluetoothInterfaceAsync:
             if pair_reply.message_type == MessageType.ERROR:
                 error_name = pair_reply.error_name
                 if error_name == "org.bluez.Error.AlreadyExists":
-                    logger.info(f"設備 {device_name} 已經配對")
                     return True
                 else:
                     logger.error(f"配對 {device_name} 失敗: {error_name}")
@@ -427,9 +412,7 @@ class BluetoothInterfaceAsync:
         for attempt in range(timeout * 2):  # 每 0.5 秒檢查一次
             card = PulseAudioManager.get_card_by_name(card_name)
             if card:
-                logger.debug(f"找到 PulseAudio 卡: {card_name}")
                 return card
-            logger.debug(f"等待 PulseAudio 卡出現... (嘗試 {attempt + 1}/{timeout * 2})")
             await asyncio.sleep(0.5)
         
         logger.error(f"等待 PulseAudio 卡 {card_name} 超時")
@@ -473,7 +456,6 @@ class BluetoothInterfaceAsync:
             
             # 驗證 profile 設置
             if not await self.verify_profile(card_name, hfp_profile.name):
-                logger.error(f"HFP profile 未設定為 {hfp_profile.name}")
                 return False
             
             return True
@@ -497,10 +479,8 @@ class BluetoothInterfaceAsync:
                     logger.info("成功設置預設音訊設備")
                     return True
                 
-                logger.debug(f"設置音訊設備嘗試 {attempt + 1}/{BluetoothConstants.RETRY_ATTEMPTS}")
-                
             except Exception as e:
-                logger.warning(f"設置音訊設備失敗 (嘗試 {attempt + 1}): {e}")
+                pass
             
             await asyncio.sleep(0.5)
         
@@ -538,7 +518,6 @@ class BluetoothInterfaceAsync:
                     for next_line in lines:
                         if "Active Profile:" in next_line:
                             current_profile = next_line.split("Active Profile:")[1].strip()
-                            logger.debug(f"當前 profile: {current_profile}, 預期: {expected_profile}")
                             return current_profile == expected_profile
             return False
             
