@@ -95,4 +95,9 @@ class BleModel {
   final BluetoothDevice bluetoothDevice;
 
   BleModel({required this.services, required this.bluetoothDevice});
+
+  String get deviceName =>
+      bluetoothDevice.platformName.isNotEmpty
+          ? bluetoothDevice.platformName
+          : bluetoothDevice.remoteId.toString();
 }
