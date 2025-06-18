@@ -5,6 +5,7 @@ class AppLocalizations {
 
   static const _localizedValues = {
     'en': {
+      'bluetooth': 'Blutooth',
       'loginOrSignUp': 'Login / Sign up',
       'logout': 'Logout',
       'loginFailed': 'Login Failed',
@@ -46,6 +47,7 @@ class AppLocalizations {
       'wait_response': 'Waiting response...',
     },
     'zh': {
+      'bluetooth': '藍芽',
       'loginOrSignUp': '登入 / 註冊',
       'logout': '登出',
       'loginFailed': '登入失敗',

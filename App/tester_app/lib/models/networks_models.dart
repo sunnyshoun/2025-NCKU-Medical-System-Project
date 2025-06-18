@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:http/http.dart' as http;
 import 'package:tester_app/configs/app_localizations.dart';
 
@@ -87,4 +88,11 @@ class ApiResponse {
     }
     return null;
   }
+}
+
+class BleModel {
+  final List<BluetoothService> services;
+  final BluetoothDevice bluetoothDevice;
+
+  BleModel({required this.services, required this.bluetoothDevice});
 }

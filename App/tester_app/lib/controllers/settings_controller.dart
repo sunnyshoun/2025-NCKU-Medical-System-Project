@@ -3,7 +3,7 @@ import 'dart:developer';
 import 'package:flutter/material.dart';
 import 'package:tester_app/configs/app_localizations.dart';
 import 'package:tester_app/controllers/cache_manager.dart';
-import 'package:tester_app/models/http_models.dart';
+import 'package:tester_app/models/networks_models.dart';
 import 'package:tester_app/models/state_models.dart';
 import 'package:tester_app/models/user_models.dart';
 import 'package:tester_app/models/wrappers.dart';

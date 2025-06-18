@@ -1,9 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:tester_app/models/cache_models.dart';
+import 'package:tester_app/models/networks_models.dart';
 import 'user_models.dart';
 
 class GeneralStateModel extends CacheModel {
   UserProfile? profile;
+  BleModel? blue;
 
   GeneralStateModel({
     super.locale,
@@ -58,7 +63,18 @@ class ChatStateModel {
     : this.messages =
           messages ??
           [
-            {'sender': 'server', 'message': '歡迎來到聊天系統，請問有什麼可以幫忙的？', 'color': Colors.black},
+            {
+              'sender': 'server',
+              'message': '歡迎來到聊天系統，請問有什麼可以幫忙的？\n(回覆並非絕對正確，需諮詢專業醫護人員)',
+              'color': Colors.black,
+            },
           ],
       this.lockSendBtn = lockSendBtn ?? false;
+}
+
+class BlueListModel {
+  List<ScanResult> scanResults = []; // 掃描結果
+  bool isScanning = false; // 是否正在掃描
+  BluetoothAdapterState adapterState = BluetoothAdapterState.unknown; // 藍牙狀態
+  StreamSubscription<BluetoothAdapterState>? adapterStateSubscription;
 }

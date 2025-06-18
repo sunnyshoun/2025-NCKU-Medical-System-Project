@@ -2,11 +2,11 @@ import 'dart:convert';
 import 'dart:developer';
 
 import 'package:http/http.dart' as http;
-import 'package:tester_app/models/http_models.dart';
+import 'package:tester_app/models/networks_models.dart';
 import 'package:tester_app/models/user_models.dart';
 
 class SpringAPI {
-  static String BASE_DOMAIN = '192.168.0.100:8080';
+  static String BASE_DOMAIN = '192.168.0.105:8080';
   static var client = http.Client();
 
   static Future<ApiResponse> register(RegistrationModel request) async {
