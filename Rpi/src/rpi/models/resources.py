@@ -1,6 +1,6 @@
 from PIL.Image import Image
 from audio.model import Language
-from bluetooth.model import Device
+from bluetooth_headset.model import Device
 
 # --- hardware ---
 class IButton:

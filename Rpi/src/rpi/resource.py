@@ -4,8 +4,8 @@ from audio.recognizer import recognize_direct
 from audio.language_detection import detect_language
 from audio.player import audio_player
 from audio.model import Language
-from bluetooth.device_manager import bt_interface
-from bluetooth.model import Device
+from bluetooth_headset.device_manager import bt_interface
+from bluetooth_headset.model import Device
 from config_manager import get_config_value
 import logging
 

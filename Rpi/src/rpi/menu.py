@@ -3,7 +3,7 @@ import logging
 import threading
 from .models import Menu, TextMenuElement, IconMenuElement, MenuBase
 from data.draw import draw_bluetooth_icon, draw_start_icon, draw_volume_icon, cross, check, draw_loading_frames
-from bluetooth.model import Device
+from bluetooth_headset.model import Device
 from config_manager import get_config_value
 from settings import *
 from typing import Callable
