@@ -1,15 +1,16 @@
 import time
+import logging
 import threading
 from .models import Menu, TextMenuElement, IconMenuElement, MenuBase
 from data.draw import draw_bluetooth_icon, draw_start_icon, draw_volume_icon, cross, check, draw_loading_frames
 from bluetooth.model import Device
 from config_manager import get_config_value
 from settings import *
-import logging
 from typing import Callable
 from PIL.Image import Image
 
-_LOGGER = logging.getLogger('menu')
+_LOGGER = logging.getLogger('Menu')
+_LOGGER.setLevel(LOGGER_LEVEL)
 
 def bluetooth_enter_callback() -> int:
     _LOGGER.info('Enter bluetooth')
@@ -95,7 +96,6 @@ class MainMenu(MenuBase):
             self.bt_device = default_device
         
         _LOGGER.info(f'Connect to default device: {connect_result}')
-        self.refresh_bluetooth()
 
     def start_bluetooth_update(self):
         """啟動後台線程，每 3 秒更新藍牙設備列表"""
