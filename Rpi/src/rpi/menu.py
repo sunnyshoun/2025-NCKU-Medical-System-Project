@@ -9,8 +9,7 @@ from settings import *
 from typing import Callable
 from PIL.Image import Image
 
-_LOGGER = logging.getLogger('Menu')
-_LOGGER.setLevel(LOGGER_LEVEL)
+_LOGGER = logging.getLogger('menu')
 
 def bluetooth_enter_callback() -> int:
     _LOGGER.info('Enter bluetooth')
@@ -62,7 +61,6 @@ class MainMenu(MenuBase):
 
     def __init__(self, tester_func: Callable[[], int], *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-
         root_ele = [
             IconMenuElement(draw_start_icon(), tester_func, 'start'),
             IconMenuElement(draw_bluetooth_icon(), bluetooth_enter_callback, 'bluetooth'),
@@ -95,7 +93,7 @@ class MainMenu(MenuBase):
         if connect_result:
             self.bt_device = default_device
         
-        _LOGGER.info(f'Connect to default device: {connect_result}')
+        print(f'Connect to default device: {connect_result}')
 
     def start_bluetooth_update(self):
         """啟動後台線程，每 3 秒更新藍牙設備列表"""
