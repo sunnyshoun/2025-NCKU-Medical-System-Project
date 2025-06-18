@@ -43,7 +43,7 @@ class GattApplication(ServiceInterface):
                 }
         return response
 
-class SimpleBLEServer:
+class BLEServer:
     CUSTOM_SERVICE_UUID = "12345678-1234-5678-9abc-def012345678"
     CONTROL_CHAR_UUID = "12345678-1234-1234-1234-123456789ab1"
     DATA_CHAR_UUID = "12345678-1234-1234-1234-123456789ab2"
@@ -362,7 +362,7 @@ async def main():
         status = "connected" if connected else "disconnected"
         logger.info(f"Device {status}")
     
-    robot = SimpleBLEServer("EyeDwell")
+    robot = BLEServer("EyeDwell")
     robot.on_control_command = on_control_command
     robot.on_data_received = on_data_received
     robot.on_file_received = on_file_received
