@@ -2,6 +2,7 @@ import 'dart:developer';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:tester_app/configs/app_localizations.dart';
 import 'package:tester_app/controllers/bluetooth_controller.dart';
 
@@ -17,7 +18,17 @@ class _BluetoothPageState extends State<BluetoothPage> {
   @override
   void initState() {
     super.initState();
+    _checkPermissions();
     _initBluetooth();
+  }
+
+  void _checkPermissions() async {
+    await [
+      Permission.location,
+      Permission.bluetoothScan,
+      Permission.bluetoothConnect,
+      Permission.bluetooth,
+    ].request();
   }
 
   void _initBluetooth() async {
