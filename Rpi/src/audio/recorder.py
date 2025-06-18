@@ -110,4 +110,17 @@ class AudioRecorder:
             return file_path
         return None
 
-audio_recorder = AudioRecorder()
+class LazyAudioRecorder:
+    """延遲初始化的 AudioRecorder 包裝器"""
+    def __init__(self):
+        self._instance = None
+    
+    def _get_instance(self):
+        if self._instance is None:
+            self._instance = AudioRecorder()
+        return self._instance
+    
+    def __getattr__(self, name):
+        return getattr(self._get_instance(), name)
+
+audio_recorder = LazyAudioRecorder()
