@@ -5,7 +5,7 @@ import requests
 from typing import Optional
 from settings import SPEECH_API_TOKEN, SPEECH_API_URL
 from .model import Language
-from .recorder import audio_recorder
+from .recorder import get_recorder
 
 logger = logging.getLogger("recognizer")
 
@@ -34,7 +34,7 @@ def recognize(wav_path: str, language: Language) -> Optional[str]:
 def recognize_direct(language: Language) -> int:
     """return direct_code:int"""
     while True:
-        wav_file = audio_recorder.record_speech()
+        wav_file = get_recorder().record_speech()
         if not wav_file:
             continue
 
