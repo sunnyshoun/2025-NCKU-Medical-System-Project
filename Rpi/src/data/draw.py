@@ -99,55 +99,53 @@ def draw_start_icon() -> Image.Image:
     return img
 
 def draw_phone_icon() -> Image.Image:
+    """繪製手機圖案 - 用於手機連線時顯示"""
     img = Image.new('1', (128, 64), 0)
     draw = ImageDraw.Draw(img)
     
-    phone_width, phone_height = 16, 28
+    # 手機外框
+    phone_width, phone_height = 20, 35
     top_left = (64 - phone_width // 2, 32 - phone_height // 2)
     bottom_right = (top_left[0] + phone_width, top_left[1] + phone_height)
-    draw.rectangle([top_left, bottom_right], fill=1, outline=1, width=2)
     
-    screen_offset = 2
+    # 繪製手機外框
+    draw.rectangle([top_left, bottom_right], fill=0, outline=1, width=2)
+    
+    # 繪製螢幕
+    screen_offset = 3
+    screen_top_left = (top_left[0] + screen_offset, top_left[1] + screen_offset + 2)
+    screen_bottom_right = (bottom_right[0] - screen_offset, bottom_right[1] - screen_offset - 2)
+    draw.rectangle([screen_top_left, screen_bottom_right], fill=1)
+    
+    # 繪製 home 按鈕
+    button_width, button_height = 6, 2
+    button_x = top_left[0] + phone_width // 2 - button_width // 2
+    button_y = bottom_right[1] - button_height - 3
     draw.rectangle(
-        [(top_left[0] + screen_offset, top_left[1] + screen_offset),
-         (bottom_right[0] - screen_offset, bottom_right[1] - screen_offset)],
+        [(button_x, button_y), (button_x + button_width, button_y + button_height)],
         fill=0
     )
     
-    button_width, button_height = 4, 2
-    button_x = top_left[0] + phone_width // 2 - button_width // 2
-    button_y = bottom_right[1] - button_height - 2
+    # 繪製聽筒
+    speaker_width, speaker_height = 8, 1
+    speaker_x = top_left[0] + phone_width // 2 - speaker_width // 2
+    speaker_y = top_left[1] + 2
     draw.rectangle(
-        [(button_x, button_y), (button_x + button_width, button_y + button_height)],
-        fill=1
+        [(speaker_x, speaker_y), (speaker_x + speaker_width, speaker_y + speaker_height)],
+        fill=0
     )
-
-    return img
-
-def draw_phone_connected_icon() -> Image.Image:
-    img = draw_phone_icon()
-    draw = ImageDraw.Draw(img)
-    
-    signal_x = 64 + 12
-    signal_y = 32 - 10
-    for i in range(3):
-        arc_size = 6 + i * 3
-        draw.arc(
-            [signal_x + i * 3, signal_y - arc_size // 2,
-             signal_x + arc_size, signal_y + arc_size // 2],
-            start=270, end=0,
-            fill=1, width=1
-        )
 
     return img
 
 def check(img: Image.Image) -> Image.Image:
+    """在圖像上繪製勾選標記"""
     draw = ImageDraw.Draw(img)
     draw.line([(5, 15), (10, 20)], fill=1, width=2)
     draw.line([(10, 20), (20, 5)], fill=1, width=2)
     return img
 
 def cross(img: Image.Image) -> Image.Image:
+    """在圖像上繪製叉號標記"""
     draw = ImageDraw.Draw(img)
     draw.line([(5, 5), (20, 20)], fill=1, width=2)
     draw.line([(20, 5), (5, 20)], fill=1, width=2)
