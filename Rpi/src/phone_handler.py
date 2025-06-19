@@ -21,7 +21,7 @@ class PhoneHandler:
         self.logger.info("啟動手機處理器...")
         
         # 創建並啟動簡化的 BLE 服務器
-        self.ble_server = BLEServer("EyeDwell_Robot")
+        self.ble_server = BLEServer("EyeDwell")
         
         # 設置回調函數
         self.ble_server.on_control_command = self._handle_control_command
@@ -46,7 +46,7 @@ class PhoneHandler:
         return self.connection_status
     
     async def _handle_connection_changed(self, connected: bool):
-        connected = False # for test
+        # connected = False # for test
         """處理連線狀態變化"""
         self.connection_status = connected
         self.logger.info(f"手機連線狀態變更: {connected}")
