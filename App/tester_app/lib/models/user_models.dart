@@ -1,14 +1,14 @@
 class UserProfile {
   String username;
   String email;
-  int? age;
+  int age;
   String? gender;
   String? job;
 
   UserProfile._({
     required this.username,
     required this.email,
-    this.age,
+    required this.age,
     this.gender,
     this.job,
   });
@@ -17,13 +17,13 @@ class UserProfile {
   factory UserProfile({
     required String username,
     required String email,
-    int? age,
+    required int age,
     String? gender,
     String? job,
   }) {
     final cleanedUserName = username.trim().isEmpty ? '' : username.trim();
     final cleanedEmail = isEmailValid(email) ? email : '';
-    final cleanedAge = (age != null && age > 0) ? age : null;
+    final cleanedAge = (age > 0) ? age : 0;
     final cleanedGender = (gender?.trim().isEmpty ?? true) ? null : gender;
     final cleanedJob = (job?.trim().isEmpty ?? true) ? null : job;
 
@@ -39,7 +39,7 @@ class UserProfile {
   Map<String, dynamic> toJson() => {
     'username': username,
     'email': email,
-    if (age != null) 'age': age,
+    'age': age,
     if (gender != null) 'gender': gender,
     if (job != null) 'job': job,
   };
@@ -48,13 +48,13 @@ class UserProfile {
     return UserProfile._(
       username: json['username'] ?? '',
       email: json['email'] ?? '',
-      age: json['age'],
+      age: json['age'] ?? 0,
       gender: json['gender'],
       job: json['job'],
     );
   }
 
-  bool get isValid => username.isNotEmpty && isEmailValid(email);
+  bool get isValid => username.isNotEmpty && isEmailValid(email) && age > 0;
 
   static bool isEmailValid(String email) {
     final emailRegex = RegExp(r'^[^@]+@[^@]+\.[^@]+');
@@ -68,7 +68,7 @@ class RegistrationModel extends UserProfile {
   RegistrationModel._({
     required super.username,
     required super.email,
-    super.age,
+    required super.age,
     super.gender,
     super.job,
     required this.password,
@@ -78,7 +78,7 @@ class RegistrationModel extends UserProfile {
     required String username,
     required String email,
     required String password,
-    int? age,
+    required int age,
     String? gender,
     String? job,
   }) {
@@ -113,7 +113,7 @@ class RegistrationModel extends UserProfile {
       username: json['username'] ?? '',
       email: json['email'] ?? '',
       password: json['password'] ?? '',
-      age: json['age'],
+      age: json['age'] ?? 0,
       gender: json['gender'],
       job: json['job'],
     );
@@ -132,7 +132,7 @@ class VisionRecord {
   final String uncorrectedVisionRight;
   final DateTime createdAt;
 
-   VisionRecord({
+  VisionRecord({
     this.correctedVisionLeft,
     this.correctedPowerLeft,
     this.correctedVisionRight,
