@@ -53,7 +53,7 @@ class UpdateProfileController {
     final profile = states.profile;
     usernameController.text = profile?.username ?? '';
     emailController.text = profile?.email ?? '';
-    ageController.text = profile?.age?.toString() ?? '';
+    ageController.text = profile?.age.toString() ?? '';
     genderController.text = profile?.gender ?? '';
     jobController.text = profile?.job ?? '';
   }
@@ -62,7 +62,7 @@ class UpdateProfileController {
     return UserProfile(
       username: usernameController.text,
       email: emailController.text,
-      age: int.tryParse(ageController.text),
+      age: int.tryParse(ageController.text) ?? 0,
       gender: genderController.text.isEmpty ? null : genderController.text,
       job: jobController.text.isEmpty ? null : jobController.text,
     );

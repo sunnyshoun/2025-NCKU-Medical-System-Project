@@ -8,7 +8,7 @@ import 'package:tester_app/models/state_models.dart';
 
 class BluetoothController {
   final GeneralStateModel generalStates;
-  final BlueListModel blueStates;
+  final BlueListStateModel blueStates;
   final List<void Function(List<ScanResult>)> onListChanged = [];
   final List<void Function()> onConnected = [];
 
@@ -31,11 +31,11 @@ class BluetoothController {
         ),
   );
 
-  void startScan(BuildContext context) async {
-    if (blueStates.adapterState != BluetoothAdapterState.on) {
-      showErr('藍牙未開啟', context);
-      return;
-    }
+  Future<void> startScan(BuildContext context) async {
+    // if (blueStates.adapterState != BluetoothAdapterState.on) {
+    //   showErr('藍牙未開啟', context);
+    //   return;
+    // }
 
     log('startScan');
 
@@ -51,7 +51,11 @@ class BluetoothController {
     }
   }
 
-  void stopScan() => FlutterBluePlus.stopScan();
+  Future<void> stopScan() async {
+    log('stopScan');
+    await FlutterBluePlus.stopScan();
+    blueStates.scanResults.clear();
+  }
 
   void connectToDevice(BluetoothDevice device) async {
     try {

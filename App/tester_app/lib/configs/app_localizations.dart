@@ -5,6 +5,7 @@ class AppLocalizations {
 
   static const _localizedValues = {
     'en': {
+      'age_invalid':'Age is not valid',
       'bluetooth': 'Blutooth',
       'loginOrSignUp': 'Login / Sign up',
       'logout': 'Logout',
@@ -26,6 +27,12 @@ class AppLocalizations {
       'email_invalid': 'Email is invalid',
       'username': 'Username',
       'require_username': 'Username is quired',
+      'require_username_or_email': 'Username or Eamil is quired',
+      'refresh_bluetooth': 'Refresh bluetooth devices',
+      'refresh_records': 'Refresh eye test records',
+      'require_password': 'Please enter password',
+      'require_email': 'Please enter Email',
+      'require_age' : 'Please enter age',
       'age': 'Age',
       'gender': 'Gender',
       'job': 'Job',
@@ -48,6 +55,7 @@ class AppLocalizations {
       'wait_response': 'Waiting response...',
     },
     'zh': {
+      'age_invalid':'年齡不能給你這樣搞',
       'bluetooth': '藍芽',
       'loginOrSignUp': '登入 / 註冊',
       'logout': '登出',
@@ -69,6 +77,12 @@ class AppLocalizations {
       'email_invalid': 'Email不正確',
       'username': '使用者名稱',
       'require_username': '需要使用者名稱',
+      'require_username_or_email': '需要使用者名稱 或 Eamil',
+      'refresh_bluetooth': '重新搜尋藍芽裝置',
+      'refresh_records': '重整視力紀錄',
+      'require_password': '請輸入密碼',
+      'require_email': '請輸入 Email',
+      'require_age' : '請輸入年紀',
       'age': '年齡',
       'gender': '性別',
       'job': '職業',
