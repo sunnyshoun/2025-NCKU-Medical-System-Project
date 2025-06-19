@@ -1,17 +1,14 @@
-"""
-測試協調器 - 最終簡化版，不處理音檔傳輸
-"""
-
 import logging
 import threading
 import asyncio
-import time
 from typing import Optional
 
 from settings import *
 from rpi.models import VisionTest
 from rpi.tester import make_test
+from rpi.resource import Audio
 
+from traceback import print_exc
 
 class TestCoordinator:
     """協調視力測試的執行，支援按鈕模式和手機模式"""
@@ -23,9 +20,13 @@ class TestCoordinator:
         self.motor = motor
         self.oled = oled
         self.sonic = sonic
+        self.audio = audio
         
         # 軟體資源（只用於按鈕模式）
-        self.audio = audio
+        if not isinstance(audio, Audio):
+            self.logger.error("提供的 audio 不是 Audio 實例")
+            audio = Audio()
+        
         self.stt = stt
         
         # 手機處理器
@@ -48,7 +49,7 @@ class TestCoordinator:
         with self.test_lock:
             return self.test_active
     
-    def start_button_test(self):
+    def start_button_test(self) -> bool:
         """開始按鈕模式測試"""
         with self.test_lock:
             if self.test_active:
@@ -147,7 +148,26 @@ class TestCoordinator:
         self.response_event.clear()
         
         # 通知手機可以選擇方向了
-        asyncio.create_task(self.phone_handler.notify_ready_for_direction())
+        try:
+            # 在事件循環中執行通知
+            def notify_phone():
+                try:
+                    loop = asyncio.get_event_loop()
+                    loop.create_task(self.phone_handler.notify_ready_for_direction())
+                except RuntimeError:
+                    # 如果沒有事件循環，創建新線程執行
+                    async def async_notify():
+                        await self.phone_handler.notify_ready_for_direction()
+                    
+                    threading.Thread(
+                        target=lambda: asyncio.run(async_notify()),
+                        daemon=True
+                    ).start()
+            
+            notify_phone()
+            
+        except Exception as e:
+            self.logger.error(f"通知手機失敗: {e}")
         
         # 等待回應
         if self.response_event.wait(timeout):
@@ -164,6 +184,7 @@ class TestCoordinator:
         try:
             make_test(self.current_test, phone_mode=False)
         except Exception as e:
+            print_exc()
             self.logger.error(f"按鈕模式測試失敗: {e}")
         finally:
             with self.test_lock:
@@ -180,10 +201,23 @@ class TestCoordinator:
                 result = self.current_test.max_degree
             else:
                 result = 0.0
-                
-            asyncio.create_task(
-                self.phone_handler.send_test_result(result)
-            )
+            
+            # 在事件循環中發送結果
+            def send_result():
+                try:
+                    loop = asyncio.get_event_loop()
+                    loop.create_task(self.phone_handler.send_test_result(result))
+                except RuntimeError:
+                    # 如果沒有事件循環，創建新線程執行
+                    async def async_send():
+                        await self.phone_handler.send_test_result(result)
+                    
+                    threading.Thread(
+                        target=lambda: asyncio.run(async_send()),
+                        daemon=True
+                    ).start()
+            
+            send_result()
                 
         except Exception as e:
             self.logger.error(f"手機模式測試失敗: {e}")

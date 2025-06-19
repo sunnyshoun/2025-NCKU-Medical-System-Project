@@ -38,14 +38,9 @@ def _handle_start_mov(test: VisionTest, delta: float, phone_mode: bool = False):
     target = test.cur_distance + (delta / 1000)
     _LOGGER.info(f"Start moving {delta} mm to {round(target, 3)} (phone_mode: {phone_mode})")
 
-    if phone_mode:
-        # 手機模式：清空 OLED，使用draw.py繪製，由oled控制模組更新螢幕
-        test.oled.clear()
-        test.oled.display()
-    else:
-        # 按鈕模式：清空 OLED 顯示
-        test.oled.clear()
-        test.oled.display()
+    # 清空 OLED 顯示（兩種模式都一樣）
+    test.oled.clear()
+    test.oled.display()
 
     # 發送馬達控制命令
     msg = f'm{0 if delta > 0 else 1},{abs(delta)}\n'
@@ -67,12 +62,12 @@ def _handle_show_img(test: VisionTest, phone_mode: bool = False):
     _LOGGER.debug(f"Dir: {test.dir} (phone_mode: {phone_mode})")
     
     if phone_mode:
-        # 手機模式：清空 OLED，圖像處理由手機端負責
+        # 手機模式：清空 OLED，圖像由手機端處理
         test.oled.clear()
         test.oled.display()
         _LOGGER.info("手機模式：圖像將由手機端處理")
     else:
-        # 按鈕模式：在 OLED 上顯示圖像，使用draw.py繪製
+        # 按鈕模式：在 OLED 上顯示圖像
         img = draw_circle_with_right_opening(thickness=thickness)
         result = paste_square_image_centered(img.rotate(test.dir * 90))
         show_img(test, result)
@@ -123,33 +118,39 @@ def show_result(test: VisionTest, degree: float, phone_mode: bool = False) -> No
         d = degree
 
     if phone_mode:
-        # 手機模式：結果只發送到手機，OLED不顯示結果
+        # 手機模式：結果將由 test_coordinator 發送到手機，OLED 保持清空
         test.oled.clear()
         test.oled.display()
-        _LOGGER.info(f"測試完成，結果只發送到手機: {d}，OLED不顯示結果")
+        _LOGGER.info(f"測試完成，結果將發送到手機: {d}")
     else:
-        # 按鈕模式：在 OLED 上顯示結果，使用draw.py繪製圖案
-        image = new('1', (128, 64))
-        draw = ImageDraw.Draw(image)
-        font = ImageFont.truetype(**RESULT_FONT)
+        # 按鈕模式：在 OLED 上顯示結果
+        try:
+            image = new('1', (128, 64))
+            draw = ImageDraw.Draw(image)
+            font = ImageFont.truetype(**RESULT_FONT)
 
-        # 使用draw.py的繪製邏輯
-        draw.rectangle((0, 0, 128, 64), outline=0, fill=0)
-        draw.text((0, 0), RESULT_STRS[test.lang.lang_code], font=font, fill=255)
-        draw.text((5, 22), f'{d:0.1f}', font=font, fill = 255)
-        
-        # 由oled控制模組更新螢幕
-        test.oled.set_img(image)
-        test.oled.display()
-        
-        # 播放完成音檔
-        test.audio.play_async(TEST_DONE_FILE, LANGUAGES[test.lang.lang_code])
+            # 繪製結果
+            draw.rectangle((0, 0, 128, 64), outline=0, fill=0)
+            draw.text((0, 0), RESULT_STRS[test.lang.lang_code], font=font, fill=255)
+            draw.text((5, 22), f'{d:0.1f}', font=font, fill=255)
+            
+            # 由oled控制模組更新螢幕
+            test.oled.set_img(image)
+            test.oled.display()
+            
+            # 播放完成音檔
+            test.audio.play_async(TEST_DONE_FILE, LANGUAGES[test.lang.lang_code])
+        except Exception as e:
+            _LOGGER.error(f"顯示測試結果失敗: {e}")
 
 def show_img(test: VisionTest, img: Image) -> None:
     """顯示圖像，由oled控制模組更新螢幕"""
-    _LOGGER.info(f'Show image, dir: {test.dir}')
-    test.oled.set_img(img)
-    test.oled.display()
+    try:
+        _LOGGER.info(f'Show image, dir: {test.dir}')
+        test.oled.set_img(img)
+        test.oled.display()
+    except Exception as e:
+        _LOGGER.error(f"顯示圖像失敗: {e}")
 
 def test_resp(test: VisionTest) -> bool:
     while True:
@@ -157,7 +158,7 @@ def test_resp(test: VisionTest) -> bool:
             _LOGGER.info(f'Waiting test resp')
             res = test.stt.get_test_resp(test.lang)
             _LOGGER.info(f'Got response: {res}')
-            return  res == test.dir
+            return res == test.dir
 
         except ValueError as e:
             _LOGGER.warning(e.args[0])
