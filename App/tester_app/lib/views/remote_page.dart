@@ -1,3 +1,5 @@
+import 'dart:developer';
+
 import 'package:flutter/material.dart';
 import 'package:tester_app/configs/app_localizations.dart';
 import 'package:tester_app/controllers/bluetooth_controller.dart';
@@ -23,6 +25,7 @@ class _RemotePageState extends State<RemotePage> {
 
   @override
   Widget build(BuildContext context) {
+    log('build RemotePage');
     final states = widget.states;
     final t = AppLocalizations(states.locale);
     final fontSize = states.fontSize;
@@ -30,10 +33,13 @@ class _RemotePageState extends State<RemotePage> {
     if (states.blue == null) {
       final blueController = BluetoothController(
         generalStates: states,
-        blueStates: BlueListModel(),
+        blueStates: BlueListStateModel(),
       );
       blueController.onConnected.add(() => setState(() {}));
-      return BluetoothPage(controller: blueController);
+      return BluetoothPage(
+        generalStates: states,
+        blueStates: BlueListStateModel(),
+      );
     }
 
     return Scaffold(
@@ -114,7 +120,7 @@ class _RemotePageState extends State<RemotePage> {
                         () => setState(() {
                           states.blue = null;
                         }),
-                    label: Text(t.get('diconnect')),
+                    label: Text(t.get('disconnect')),
                   ),
                 ],
               ),

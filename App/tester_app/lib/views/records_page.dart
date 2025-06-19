@@ -48,8 +48,9 @@ class _VisionRecordsWidgetState extends State<VisionRecordsWidget> {
     final t = AppLocalizations(generalStates.locale);
     final controller = widget.controller;
     controller.addSearchListener(
-      () => setState(() =>
-        widget.recordsStates.searchText = controller.searchController.text
+      () => setState(
+        () =>
+            widget.recordsStates.searchText = controller.searchController.text,
       ),
     );
     controller.addFetchListener(() {
@@ -95,6 +96,21 @@ class _VisionRecordsWidgetState extends State<VisionRecordsWidget> {
                   record: sortedFilteredRecords[index],
                   generalStates: generalStates,
                 );
+              },
+            ),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              label: Text(
+                t.get('refresh_records'),
+                style: TextStyle(fontSize: generalStates.fontSize),
+              ),
+              icon: const Icon(Icons.replay_outlined),
+              onPressed: () {
+                log('refresh record');
+                controller.fetchRecords();
               },
             ),
           ),
