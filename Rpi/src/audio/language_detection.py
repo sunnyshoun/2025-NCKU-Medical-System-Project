@@ -1,7 +1,7 @@
 import time
 from .model import Language
 from .recognizer import recognize
-from .recorder import audio_recorder
+from .recorder import get_recorder
 from settings import LANG_JP, LANG_EN, LANG_ZH, LANG_TW
 
 LANGUAGE_MODELS = {
@@ -25,7 +25,7 @@ def detect_language(timeout_seconds: float = 30.0) -> Language:
     start_time = time.time()
 
     while time.time() - start_time < timeout_seconds:
-        wav_file = audio_recorder.record_speech(max_duration=5.0)
+        wav_file = get_recorder().record_speech(max_duration=5.0)
         if not wav_file:
             continue
 

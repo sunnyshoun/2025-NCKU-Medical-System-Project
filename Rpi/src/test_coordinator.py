@@ -7,6 +7,7 @@ from settings import *
 from rpi.models import VisionTest
 from rpi.tester import make_test
 from rpi.resource import Audio
+from hardwares.button import Button
 
 from traceback import print_exc
 
@@ -183,8 +184,8 @@ class TestCoordinator:
         """運行按鈕模式測試"""
         try:
             make_test(self.current_test, phone_mode=False)
+            Button().read_btn()
         except Exception as e:
-            print_exc()
             self.logger.error(f"按鈕模式測試失敗: {e}")
         finally:
             with self.test_lock:
