@@ -6,7 +6,7 @@ from data import vision
 from data.draw import draw_circle_with_right_opening, paste_square_image_centered
 from PIL.Image import Image, new
 from PIL import ImageDraw, ImageFont
-import logging, random, json, asyncio, time
+import logging, random
 
 _LOGGER = logging.getLogger('Interrupt')
 
@@ -39,13 +39,15 @@ def _handle_start_mov(test: VisionTest, delta: float, phone_mode: bool = False):
     _LOGGER.info(f"Start moving {delta} mm to {round(target, 3)} (phone_mode: {phone_mode})")
 
     if phone_mode:
-        # 手機模式：發送移動命令到手機
-        send_movement_command_to_phone(test, delta)
+        # 手機模式：清空 OLED，使用draw.py繪製，由oled控制模組更新螢幕
+        test.oled.clear()
+        test.oled.display()
     else:
-        # 按鈕模式：直接控制馬達
+        # 按鈕模式：清空 OLED 顯示
         test.oled.clear()
         test.oled.display()
 
+    # 發送馬達控制命令
     msg = f'm{0 if delta > 0 else 1},{abs(delta)}\n'
     _LOGGER.debug(f"sending: {msg.rstrip()}")
     test.motor.write(msg.encode())
@@ -65,38 +67,47 @@ def _handle_show_img(test: VisionTest, phone_mode: bool = False):
     _LOGGER.debug(f"Dir: {test.dir} (phone_mode: {phone_mode})")
     
     if phone_mode:
-        # 手機模式：發送圖像數據到手機
-        send_image_to_phone(test, thickness, test.dir)
+        # 手機模式：清空 OLED，圖像處理由手機端負責
+        test.oled.clear()
+        test.oled.display()
+        _LOGGER.info("手機模式：圖像將由手機端處理")
     else:
-        # 按鈕模式：在 OLED 上顯示圖像
+        # 按鈕模式：在 OLED 上顯示圖像，使用draw.py繪製
         img = draw_circle_with_right_opening(thickness=thickness)
         result = paste_square_image_centered(img.rotate(test.dir * 90))
         show_img(test, result)
 
 def _handle_user_response(test: VisionTest, phone_mode: bool = False):
     if phone_mode:
-        # 手機模式：請求手機端使用者回應
-        request_phone_user_response(test)
-        # 等待手機回應（已在其他地方處理）
-        wait_for_phone_response(test)
+        # 手機模式：等待手機回應
+        test.got_resp = _get_phone_test_response(test)
     else:
         # 按鈕模式：使用語音辨識
         test.got_resp = test_resp(test)
     
     _LOGGER.info(f'Got test response: {test.got_resp} (phone_mode: {phone_mode})')
 
+def _get_phone_test_response(test: VisionTest) -> bool:
+    """獲取手機測試回應"""
+    try:
+        # 使用手機模式的 STT API 獲取回應
+        direction = test.stt.get_test_resp(test.lang)
+        return direction == test.dir
+    except Exception as e:
+        _LOGGER.error(f"獲取手機測試回應失敗: {e}")
+        return False
 
 def wait_mov(test: VisionTest, phone_mode: bool = False):
     resp = test.motor.readline().decode().strip()
 
     if resp == 'done':
         if phone_mode:
-            # 手機模式：發送移動完成通知
-            send_movement_done_to_phone(test)
+            # 手機模式：移動完成，不播放提示音
+            _LOGGER.info("機器人移動完成（手機模式，無音檔播放）")
         else:
             # 按鈕模式：播放提示音
             test.audio.play_async(BEEP_FILE, 'all')
-        _LOGGER.info(f"Move done (phone_mode: {phone_mode})")
+            _LOGGER.info("機器人移動完成（按鈕模式，播放提示音）")
     else:
         raise ValueError(f'Unexpected response from wait move: {resp}')
 
@@ -112,22 +123,30 @@ def show_result(test: VisionTest, degree: float, phone_mode: bool = False) -> No
         d = degree
 
     if phone_mode:
-        # 手機模式：發送結果到手機
-        send_result_to_phone(test, d)
+        # 手機模式：結果只發送到手機，OLED不顯示結果
+        test.oled.clear()
+        test.oled.display()
+        _LOGGER.info(f"測試完成，結果只發送到手機: {d}，OLED不顯示結果")
     else:
-        # 按鈕模式：在 OLED 上顯示結果
+        # 按鈕模式：在 OLED 上顯示結果，使用draw.py繪製圖案
         image = new('1', (128, 64))
         draw = ImageDraw.Draw(image)
         font = ImageFont.truetype(**RESULT_FONT)
 
+        # 使用draw.py的繪製邏輯
         draw.rectangle((0, 0, 128, 64), outline=0, fill=0)
         draw.text((0, 0), RESULT_STRS[test.lang.lang_code], font=font, fill=255)
         draw.text((5, 22), f'{d:0.1f}', font=font, fill = 255)
+        
+        # 由oled控制模組更新螢幕
         test.oled.set_img(image)
         test.oled.display()
+        
+        # 播放完成音檔
         test.audio.play_async(TEST_DONE_FILE, LANGUAGES[test.lang.lang_code])
 
 def show_img(test: VisionTest, img: Image) -> None:
+    """顯示圖像，由oled控制模組更新螢幕"""
     _LOGGER.info(f'Show image, dir: {test.dir}')
     test.oled.set_img(img)
     test.oled.display()
@@ -151,124 +170,3 @@ def lang_resp(test: VisionTest) -> Language:
 
         except ValueError as e:
             _LOGGER.warning(e.args[0])
-
-
-# === 手機模式專用函數 ===
-
-def send_movement_command_to_phone(test: VisionTest, delta: float):
-    """發送移動命令到手機"""
-    try:
-        if hasattr(test, 'phone_controller'):
-            command = {
-                "type": "robot_movement",
-                "distance_mm": delta,
-                "message": f"機器人移動 {delta}mm"
-            }
-            asyncio.create_task(
-                test.phone_controller.send_data(json.dumps(command).encode('utf-8'))
-            )
-    except Exception as e:
-        _LOGGER.error(f"發送移動命令失敗: {e}")
-
-def send_image_to_phone(test: VisionTest, thickness: int, direction: int):
-    """發送圖像數據到手機"""
-    try:
-        if hasattr(test, 'phone_controller'):
-            command = {
-                "type": "show_vision_test",
-                "thickness": thickness,
-                "direction": direction,
-                "degree": test.cur_degree
-            }
-            asyncio.create_task(
-                test.phone_controller.send_data(json.dumps(command).encode('utf-8'))
-            )
-    except Exception as e:
-        _LOGGER.error(f"發送圖像數據失敗: {e}")
-
-def request_phone_user_response(test: VisionTest):
-    """請求手機端使用者回應"""
-    try:
-        if hasattr(test, 'phone_controller'):
-            command = {
-                "type": "request_user_input",
-                "message": "請指出開口方向",
-                "options": ["右", "上", "左", "下"]
-            }
-            asyncio.create_task(
-                test.phone_controller.send_data(json.dumps(command).encode('utf-8'))
-            )
-    except Exception as e:
-        _LOGGER.error(f"請求使用者回應失敗: {e}")
-
-def wait_for_phone_response(test: VisionTest):
-    """等待手機回應"""
-    timeout = 30
-    start_time = time.time()
-    
-    while test.got_resp is None and (time.time() - start_time) < timeout:
-        time.sleep(0.1)
-    
-    if test.got_resp is None:
-        _LOGGER.warning("等待手機回應超時")
-        test.got_resp = False
-
-def send_movement_done_to_phone(test: VisionTest):
-    """發送移動完成通知到手機"""
-    try:
-        if hasattr(test, 'phone_controller'):
-            command = {
-                "type": "movement_complete",
-                "message": "機器人移動完成",
-                "current_distance": test.cur_distance
-            }
-            asyncio.create_task(
-                test.phone_controller.send_data(json.dumps(command).encode('utf-8'))
-            )
-    except Exception as e:
-        _LOGGER.error(f"發送移動完成通知失敗: {e}")
-
-def send_result_to_phone(test: VisionTest, result: float):
-    """發送測試結果到手機"""
-    try:
-        if hasattr(test, 'phone_controller'):
-            command = {
-                "type": "test_complete",
-                "vision_score": result,
-                "timestamp": time.time(),
-                "message": f"視力測試完成，結果: {result}"
-            }
-            asyncio.create_task(
-                test.phone_controller.send_data(json.dumps(command).encode('utf-8'))
-            )
-    except Exception as e:
-        _LOGGER.error(f"發送測試結果失敗: {e}")
-
-def send_audio_to_phone(test: VisionTest, file_name: str, language: str):
-    """發送音訊檔案到手機播放"""
-    try:
-        if hasattr(test, 'phone_controller'):
-            import os
-            from audio.player import audio_player
-            
-            audio_path = os.path.join(audio_player.base_folder, language, file_name)
-            if os.path.exists(audio_path):
-                with open(audio_path, 'rb') as f:
-                    audio_data = f.read()
-                
-                # 發送音訊檔案
-                asyncio.create_task(
-                    test.phone_controller.send_file(audio_data)
-                )
-                
-                # 發送播放命令
-                command = {
-                    "type": "play_audio",
-                    "file_name": file_name,
-                    "language": language
-                }
-                asyncio.create_task(
-                    test.phone_controller.send_data(json.dumps(command).encode('utf-8'))
-                )
-    except Exception as e:
-        _LOGGER.error(f"發送音訊檔案失敗: {e}")
