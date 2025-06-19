@@ -143,7 +143,7 @@ class BLEServer:
     DATA_CHAR_UUID = "12345678-abcd-1234-5678-123456789ab2"     # 數據傳輸
     STATUS_CHAR_UUID = "12345678-abcd-1234-5678-123456789ab4"   # 狀態回報
 
-    def __init__(self, device_name: str = "EyeDwell_Robot"):
+    def __init__(self, device_name: str = "EyeDwell"):
         self.device_name = device_name
         self.bus: Optional[MessageBus] = None
         self.is_connected = False
