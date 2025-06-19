@@ -2,6 +2,7 @@ import asyncio
 import logging
 import json
 import os
+import time
 from typing import Optional, Callable, Dict, Any
 from dbus_fast import BusType, Variant, Message
 from dbus_fast.aio import MessageBus
@@ -44,13 +45,15 @@ class GattApplication(ServiceInterface):
         return response
 
 class BLEServer:
-    CUSTOM_SERVICE_UUID = "12345678-1234-5678-9abc-def012345678"
-    CONTROL_CHAR_UUID = "12345678-1234-1234-1234-123456789ab1"
-    DATA_CHAR_UUID = "12345678-1234-1234-1234-123456789ab2"
-    FILE_CHAR_UUID = "12345678-1234-1234-1234-123456789ab3"
-    STATUS_CHAR_UUID = "12345678-1234-1234-1234-123456789ab4"
+    # 視力測試機器人專用的 UUID
+    VISION_ROBOT_SERVICE_UUID = "12345678-abcd-1234-5678-123456789abc"
+    CONTROL_CHAR_UUID = "12345678-abcd-1234-5678-123456789ab1"  # 控制命令
+    DATA_CHAR_UUID = "12345678-abcd-1234-5678-123456789ab2"     # 數據傳輸
+    AUDIO_CHAR_UUID = "12345678-abcd-1234-5678-123456789ab3"    # 音訊檔案
+    STATUS_CHAR_UUID = "12345678-abcd-1234-5678-123456789ab4"   # 狀態回報
+    RESPONSE_CHAR_UUID = "12345678-abcd-1234-5678-123456789ab5" # 使用者回應
 
-    def __init__(self, device_name: str = "MyBLEDevice"):
+    def __init__(self, device_name: str = "EyeDwell_Robot"):
         self.device_name = device_name
         self.bus: Optional[MessageBus] = None
         self.is_connected = False
@@ -62,29 +65,34 @@ class BLEServer:
         self.characteristics_data = {
             self.CONTROL_CHAR_UUID: {'value': b'', 'flags': ['write', 'write-without-response']},
             self.DATA_CHAR_UUID: {'value': b'Ready', 'flags': ['read', 'write', 'notify']},
-            self.FILE_CHAR_UUID: {'value': b'', 'flags': ['write', 'write-without-response']},
+            self.AUDIO_CHAR_UUID: {'value': b'', 'flags': ['write', 'write-without-response']},
             self.STATUS_CHAR_UUID: {'value': b'{}', 'flags': ['read', 'notify']},
+            self.RESPONSE_CHAR_UUID: {'value': b'', 'flags': ['write', 'write-without-response']},
         }
         
+        # 回調函數
         self.on_control_command: Optional[Callable[[str], None]] = None
         self.on_data_received: Optional[Callable[[bytes], None]] = None
-        self.on_file_received: Optional[Callable[[bytes], None]] = None
+        self.on_audio_received: Optional[Callable[[bytes], None]] = None
+        self.on_user_response: Optional[Callable[[str], None]] = None
         self.on_connection_changed: Optional[Callable[[bool], None]] = None
         
-        self._file_buffer = bytearray()
-        self._expected_file_size = 0
-        self._transfer_active = False
+        # 檔案傳輸緩衝區
+        self._audio_buffer = bytearray()
+        self._expected_audio_size = 0
+        self._audio_transfer_active = False
+        
+        # 測試狀態
+        self.test_active = False
+        self.waiting_for_response = False
 
     async def start_server(self):
         try:
-            if os.getuid() != 0:
-                logger.warning("Running without root privileges. Try: sudo python3 script.py")
-            
             await self._connect_dbus()
             await self._setup_adapter()
             await self._register_advertisement()
             
-            logger.info(f"BLE server started: {self.device_name}")
+            logger.info(f"視力測試 BLE 服務器啟動: {self.device_name}")
             asyncio.create_task(self._monitor_connections())
             
         except Exception as e:
@@ -122,8 +130,8 @@ class BLEServer:
             ("Powered", Variant("b", True)),
             ("Discoverable", Variant("b", True)),
             ("DiscoverableTimeout", Variant("u", 0)),
-            ("Appearance", Variant("q", 0x0080)),
-            ("Class", Variant("u", 0x000100)),
+            ("Appearance", Variant("q", 0x0080)),  # 設備外觀：通用設備
+            ("Class", Variant("u", 0x000100)),     # 設備類別
         ]
         
         for prop, value in properties:
@@ -143,12 +151,12 @@ class BLEServer:
 
     async def _register_advertisement(self):
         try:
-            await asyncio.create_subprocess_exec('hciconfig', 'hci0', 'up')
+            await asyncio.create_subprocess_exec('sudo', 'hciconfig', 'hci0', 'up')
             await asyncio.sleep(0.5)
-            await asyncio.create_subprocess_exec('hciconfig', 'hci0', 'piscan')
+            await asyncio.create_subprocess_exec('sudo', 'hciconfig', 'hci0', 'piscan')
             await asyncio.sleep(0.5)
-            await asyncio.create_subprocess_exec('hciconfig', 'hci0', 'leadv')
-            logger.info("Advertisement registered")
+            await asyncio.create_subprocess_exec('sudo', 'hciconfig', 'hci0', 'leadv')
+            logger.info("BLE 廣播已註冊")
         except Exception as e:
             logger.error(f"Advertisement registration failed: {e}")
 
@@ -198,7 +206,7 @@ class BLEServer:
                 if connected != last_connected:
                     self.is_connected = connected
                     self.client_address = client_addr
-                    logger.info(f"Connection: {connected}")
+                    logger.info(f"手機連線狀態: {connected}")
                     
                     if self.on_connection_changed:
                         try:
@@ -217,9 +225,10 @@ class BLEServer:
                 await asyncio.sleep(5)
 
     def handle_control_command(self, data: bytes):
+        """處理來自手機的控制命令"""
         try:
             command = data.decode('utf-8', errors='ignore')
-            logger.info(f"Control command: {command}")
+            logger.info(f"收到控制命令: {command}")
             
             self.characteristics_data[self.CONTROL_CHAR_UUID]['value'] = data
             
@@ -232,8 +241,9 @@ class BLEServer:
             logger.error(f"Error handling control command: {e}")
 
     def handle_data_received(self, data: bytes):
+        """處理來自手機的一般數據"""
         try:
-            logger.info(f"Data received: {len(data)} bytes")
+            logger.info(f"收到數據: {len(data)} bytes")
             self.characteristics_data[self.DATA_CHAR_UUID]['value'] = data
             
             if self.on_data_received:
@@ -244,163 +254,220 @@ class BLEServer:
         except Exception as e:
             logger.error(f"Error handling data: {e}")
 
-    def handle_file_transfer(self, data: bytes):
+    def handle_audio_transfer(self, data: bytes):
+        """處理來自手機的音訊檔案傳輸"""
         try:
-            if not self._transfer_active:
+            if not self._audio_transfer_active:
                 if len(data) >= 4:
-                    self._expected_file_size = int.from_bytes(data[:4], 'big')
-                    self._file_buffer = bytearray(data[4:])
-                    self._transfer_active = True
-                    logger.info(f"File transfer started: {self._expected_file_size} bytes")
+                    self._expected_audio_size = int.from_bytes(data[:4], 'big')
+                    self._audio_buffer = bytearray(data[4:])
+                    self._audio_transfer_active = True
+                    logger.info(f"音訊傳輸開始: {self._expected_audio_size} bytes")
                 else:
-                    logger.warning("Invalid file transfer start")
+                    logger.warning("無效的音訊傳輸開始")
                     return
             else:
-                self._file_buffer.extend(data)
+                self._audio_buffer.extend(data)
                 
-            if len(self._file_buffer) >= self._expected_file_size:
-                file_data = bytes(self._file_buffer[:self._expected_file_size])
-                logger.info(f"File transfer completed: {len(file_data)} bytes")
+            if len(self._audio_buffer) >= self._expected_audio_size:
+                audio_data = bytes(self._audio_buffer[:self._expected_audio_size])
+                logger.info(f"音訊傳輸完成: {len(audio_data)} bytes")
                 
-                if self.on_file_received:
-                    if asyncio.iscoroutinefunction(self.on_file_received):
-                        asyncio.create_task(self.on_file_received(file_data))
+                if self.on_audio_received:
+                    if asyncio.iscoroutinefunction(self.on_audio_received):
+                        asyncio.create_task(self.on_audio_received(audio_data))
                     else:
-                        self.on_file_received(file_data)
+                        self.on_audio_received(audio_data)
                 
-                self._file_buffer.clear()
-                self._expected_file_size = 0
-                self._transfer_active = False
+                self._audio_buffer.clear()
+                self._expected_audio_size = 0
+                self._audio_transfer_active = False
                 
         except Exception as e:
-            logger.error(f"Error handling file transfer: {e}")
-            self._transfer_active = False
+            logger.error(f"Error handling audio transfer: {e}")
+            self._audio_transfer_active = False
+
+    def handle_user_response(self, data: bytes):
+        """處理來自手機的使用者回應"""
+        try:
+            response = data.decode('utf-8', errors='ignore')
+            logger.info(f"收到使用者回應: {response}")
+            
+            self.characteristics_data[self.RESPONSE_CHAR_UUID]['value'] = data
+            
+            if self.on_user_response:
+                if asyncio.iscoroutinefunction(self.on_user_response):
+                    asyncio.create_task(self.on_user_response(response))
+                else:
+                    self.on_user_response(response)
+        except Exception as e:
+            logger.error(f"Error handling user response: {e}")
 
     async def send_data(self, data: bytes) -> bool:
+        """發送數據到手機"""
         if not self.is_connected:
-            logger.warning("Cannot send data: no client connected")
+            logger.warning("無法發送數據：手機未連線")
             return False
         
         try:
             self.characteristics_data[self.DATA_CHAR_UUID]['value'] = data
-            logger.info(f"Data prepared: {len(data)} bytes")
+            logger.info(f"數據已準備發送: {len(data)} bytes")
             return True
         except Exception as e:
             logger.error(f"Error sending data: {e}")
             return False
 
-    async def send_file(self, file_data: bytes) -> bool:
+    async def send_audio_file(self, audio_data: bytes) -> bool:
+        """發送音訊檔案到手機"""
         if not self.is_connected:
-            logger.warning("Cannot send file: no client connected")
+            logger.warning("無法發送音訊：手機未連線")
             return False
         
         try:
-            size_header = len(file_data).to_bytes(4, 'big')
-            full_data = size_header + file_data
-            self.characteristics_data[self.FILE_CHAR_UUID]['value'] = full_data
-            logger.info(f"File prepared: {len(file_data)} bytes")
+            size_header = len(audio_data).to_bytes(4, 'big')
+            full_data = size_header + audio_data
+            self.characteristics_data[self.AUDIO_CHAR_UUID]['value'] = full_data
+            logger.info(f"音訊檔案已準備發送: {len(audio_data)} bytes")
             return True
         except Exception as e:
-            logger.error(f"Error sending file: {e}")
+            logger.error(f"Error sending audio file: {e}")
             return False
 
-    def get_status(self) -> dict:
+    async def send_status_update(self, status: str, details: dict = None) -> bool:
+        """發送狀態更新到手機"""
+        status_data = {
+            "status": status,
+            "details": details or {},
+            "timestamp": time.time(),
+            "robot_id": self.device_name
+        }
+        
+        try:
+            self.characteristics_data[self.STATUS_CHAR_UUID]['value'] = json.dumps(status_data).encode('utf-8')
+            logger.info(f"狀態更新已準備: {status}")
+            return True
+        except Exception as e:
+            logger.error(f"Error sending status update: {e}")
+            return False
+
+    async def request_user_input(self, message: str, input_type: str = "direction") -> bool:
+        """請求使用者輸入"""
+        command = {
+            "type": "request_input",
+            "input_type": input_type,
+            "message": message,
+            "timestamp": time.time()
+        }
+        
+        self.waiting_for_response = True
+        return await self.send_data(json.dumps(command).encode('utf-8'))
+
+    def get_robot_status(self) -> dict:
+        """獲取機器人當前狀態"""
         return {
             "connected": self.is_connected,
             "device_name": self.device_name,
             "client_address": self.client_address,
-            "transfer_active": self._transfer_active,
-            "timestamp": asyncio.get_event_loop().time()
+            "test_active": self.test_active,
+            "audio_transfer_active": self._audio_transfer_active,
+            "waiting_for_response": self.waiting_for_response,
+            "timestamp": time.time()
         }
 
+
+# 測試用的主函數
 async def main():
     def on_control_command(command: str):
-        logger.info(f"Command: {command}")
-        commands = {
-            "start_test": "Starting vision test...",
-            "stop_test": "Stopping test",
-            "calibrate": "Calibrating device...",
-            "get_results": "Preparing results",
-            "ping": "Device responds: PONG"
-        }
-        logger.info(commands.get(command.lower(), f"Unknown command: {command}"))
+        logger.info(f"控制命令: {command}")
+        try:
+            cmd_data = json.loads(command)
+            cmd_type = cmd_data.get("type")
+            
+            if cmd_type == "start_test":
+                logger.info("開始視力測試")
+            elif cmd_type == "stop_test":
+                logger.info("停止測試")
+            elif cmd_type == "test_response":
+                direction = cmd_data.get("direction")
+                logger.info(f"測試回應: 方向 {direction}")
+            else:
+                logger.info(f"未知命令: {cmd_type}")
+                
+        except json.JSONDecodeError:
+            logger.info(f"非 JSON 命令: {command}")
     
     def on_data_received(data: bytes):
-        logger.info(f"Data received: {len(data)} bytes")
+        logger.info(f"收到數據: {len(data)} bytes")
         try:
-            text = data.decode('utf-8', errors='ignore')
-            if text.startswith('{'):
-                params = json.loads(text)
-                logger.info(f"Parameters: {params}")
+            if data.startswith(b'{'):
+                text = data.decode('utf-8', errors='ignore')
+                data_obj = json.loads(text)
+                logger.info(f"數據內容: {data_obj}")
             else:
-                logger.info(f"Text: {text}")
+                logger.info(f"二進位數據: {data.hex()[:50]}...")
         except:
-            logger.info(f"Binary data: {data.hex()}")
+            logger.info(f"原始數據: {data[:50]}...")
     
-    def on_file_received(file_data: bytes):
-        logger.info(f"File received: {len(file_data)} bytes")
+    def on_audio_received(audio_data: bytes):
+        logger.info(f"收到音訊檔案: {len(audio_data)} bytes")
         try:
-            if file_data.startswith(b'{'):
-                config = json.loads(file_data.decode('utf-8'))
-                filename = f"config_{int(asyncio.get_event_loop().time())}.json"
-                logger.info(f"Config for patient: {config.get('patient_id', 'unknown')}")
-            elif file_data.startswith(b'%PDF'):
-                filename = f"report_{int(asyncio.get_event_loop().time())}.pdf"
-                logger.info("PDF report received")
-            else:
-                filename = f"file_{int(asyncio.get_event_loop().time())}.bin"
-                logger.info("Unknown file type")
-            
+            # 儲存音訊檔案用於測試
+            filename = f"received_audio_{int(time.time())}.wav"
             with open(filename, "wb") as f:
-                f.write(file_data)
-            logger.info(f"File saved: {filename}")
-            
+                f.write(audio_data)
+            logger.info(f"音訊檔案已儲存: {filename}")
         except Exception as e:
-            logger.error(f"File processing error: {e}")
+            logger.error(f"儲存音訊檔案失敗: {e}")
+    
+    def on_user_response(response: str):
+        logger.info(f"使用者回應: {response}")
+        try:
+            response_data = json.loads(response)
+            direction = response_data.get("direction")
+            logger.info(f"使用者選擇方向: {direction}")
+        except json.JSONDecodeError:
+            logger.info(f"文字回應: {response}")
     
     def on_connection_changed(connected: bool):
-        status = "connected" if connected else "disconnected"
-        logger.info(f"Device {status}")
+        status = "已連線" if connected else "已斷線"
+        logger.info(f"手機 {status}")
     
-    robot = BLEServer("EyeDwell")
+    # 創建並啟動 BLE 服務器
+    robot = BLEServer("EyeDwell_Vision_Robot")
     robot.on_control_command = on_control_command
     robot.on_data_received = on_data_received
-    robot.on_file_received = on_file_received
+    robot.on_audio_received = on_audio_received
+    robot.on_user_response = on_user_response
     robot.on_connection_changed = on_connection_changed
     
     try:
-        logger.info("Starting EyeDwell BLE server...")
+        logger.info("啟動視力測試機器人 BLE 服務器...")
         await robot.start_server()
         
         heartbeat_counter = 0
         while True:
-            await asyncio.sleep(20)
+            await asyncio.sleep(10)
             
             if robot.is_connected:
-                status_update = {
-                    "type": "vision_robot",
-                    "status": "ready"
-                }
-                await robot.send_data(json.dumps(status_update).encode('utf-8'))
+                # 發送心跳包
+                await robot.send_status_update("ready", {
+                    "heartbeat": heartbeat_counter,
+                    "test_available": True
+                })
                 heartbeat_counter += 1
                 
-                if heartbeat_counter % 5 == 0:
-                    test_result = {
-                        "test_id": f"VT_{int(asyncio.get_event_loop().time())}",
-                        "left_eye": {"acuity": "20/20", "score": 95},
-                        "right_eye": {"acuity": "20/25", "score": 92},
-                        "timestamp": asyncio.get_event_loop().time(),
-                        "device": "EyeDwell"
-                    }
-                    await robot.send_data(json.dumps(test_result).encode('utf-8'))
-                    logger.info("Test result sent")
-            else:
-                pass
+                # 每分鐘發送一次測試邀請
+                if heartbeat_counter % 6 == 0:
+                    await robot.send_test_command("test_available", {
+                        "message": "準備開始視力測試",
+                        "languages": ["中文", "English", "日本語", "台語"]
+                    })
+                    logger.info("發送測試邀請")
             
     except KeyboardInterrupt:
-        logger.info("Shutting down...")
+        logger.info("正在關閉服務器...")
     except Exception as e:
-        logger.error(f"Error: {e}")
+        logger.error(f"服務器錯誤: {e}")
     finally:
         await robot.stop_server()
 
