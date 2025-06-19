@@ -72,9 +72,8 @@ class ChatStateModel {
       this.lockSendBtn = lockSendBtn ?? false;
 }
 
-class BlueListModel {
+class BlueListStateModel {
   List<ScanResult> scanResults = []; // 掃描結果
-  bool isScanning = false; // 是否正在掃描
   BluetoothAdapterState adapterState = BluetoothAdapterState.unknown; // 藍牙狀態
   StreamSubscription<BluetoothAdapterState>? adapterStateSubscription;
 }
