@@ -17,7 +17,7 @@
 **機器人行為**:
 - 停止板載按鈕操控
 - 切換到手機控制模式  
-- OLED 顯示手機圖示（使用 `draw_phone_connected_icon()`）
+- OLED 顯示手機圖示（使用 `draw_phone_icon()`）
 
 #### 斷線後（自動處理）
 **機器人行為**:
@@ -79,8 +79,7 @@
 {
   "type": "test_complete",
   "data": {
-    "vision_score": 0.8,
-    "message": "視力測試完成，結果: 0.8"
+    "vision_score": 0.8
   }
 }
 ```

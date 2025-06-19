@@ -2,7 +2,7 @@ from .models import VisionTest, InterruptException
 from . import interrupts
 from settings import *
 from data import vision
-import logging, time, json, asyncio
+import logging, time, json
 
 _LOGGER = logging.getLogger('TestingFlow')
 _LOGGER.setLevel(LOGGER_LEVEL)
@@ -24,10 +24,8 @@ def setup(t: VisionTest, phone_mode: bool = False):
     _LOGGER.info(f'Set cur_distance to {t.cur_distance}')
 
     if phone_mode:
-        # 手機模式下，語言由手機端選擇
         _LOGGER.info('Phone mode: language set by phone')
     else:
-        # 按鈕模式下，選擇語言
         _LOGGER.debug('Choose language')
         t.lang = interrupts.lang_resp(t)
         while t.lang == None:
@@ -35,6 +33,7 @@ def setup(t: VisionTest, phone_mode: bool = False):
             time.sleep(1)
             
         _LOGGER.info(f'Set language to: {t.lang.lang_code}')
+        
         t.audio.play_async(TEST_INTRO_FILE, LANGUAGES[t.lang.lang_code])
 
 def loop(t: VisionTest, phone_mode: bool = False):

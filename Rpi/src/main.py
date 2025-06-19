@@ -40,25 +40,38 @@ async def main():
     logger = logging.getLogger("Main")
     logger.info("啟動 EyeDwell 視力測試機器人...")
     
-    # 創建並啟動機器人控制器
+    # 創建機器人控制器
     controller = RobotController()
     
     try:
+        # 啟動機器人控制器
         await controller.start()
         logger.info("系統啟動完成，等待操作...")
         
         # 保持程式運行
-        while True:
+        while controller.is_running:
             await asyncio.sleep(1)
             
     except KeyboardInterrupt:
         logger.info("收到終止信號，正在關閉系統...")
     except Exception as e:
         logger.error(f"系統執行錯誤: {e}")
+        import traceback
+        logger.error(f"錯誤詳情: {traceback.format_exc()}")
     finally:
-        await controller.stop()
-        logger.info("系統已安全關閉")
+        try:
+            await controller.stop()
+            logger.info("系統已安全關閉")
+        except Exception as e:
+            logger.error(f"關閉系統時發生錯誤: {e}")
 
 
 if __name__ == '__main__':
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("程式被中斷")
+    except Exception as e:
+        print(f"程式執行失敗: {e}")
+        import traceback
+        traceback.print_exc()

@@ -22,6 +22,7 @@ public class RegisterRequest {
     private String email;
 
     @Range(min = 1, max = 110, message = "Age must be between 1 and 110")
+    @NotBlank(message = "Age cannot be empty")
     private Integer age;
     
     private String gender;
