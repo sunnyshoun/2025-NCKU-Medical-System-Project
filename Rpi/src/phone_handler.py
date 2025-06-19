@@ -46,7 +46,7 @@ class PhoneHandler:
         return self.connection_status
     
     async def _handle_connection_changed(self, connected: bool):
-        connected = False
+        connected = False # for test
         """處理連線狀態變化"""
         self.connection_status = connected
         self.logger.info(f"手機連線狀態變更: {connected}")
