@@ -35,9 +35,12 @@ class VisionTest(VisionTestBase):
     lang: Language
 
     got_resp: bool | None
+    phone_controller: any  # 手機控制器引用（如果是手機模式）
 
     def __init__(self, *args, **kwargs):
-
+        # 提取 phone_controller 參數
+        self.phone_controller = kwargs.pop('phone_controller', None)
+        
         super().__init__(*args, **kwargs)
 
         self.max_degree = -1.0
@@ -49,7 +52,10 @@ class VisionTest(VisionTestBase):
 class InterruptException(Exception):
     end: bool
     test: VisionTest
-    def __init__(self, *args, end: bool, test: VisionTest):
+    phone_mode: bool
+    
+    def __init__(self, *args, end: bool, test: VisionTest, phone_mode: bool = False):
         super().__init__(*args)
         self.end = end
         self.test = test
+        self.phone_mode = phone_mode

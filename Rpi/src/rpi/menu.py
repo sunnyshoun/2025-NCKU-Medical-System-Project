@@ -2,7 +2,7 @@ import time
 import logging
 import threading
 from .models import Menu, TextMenuElement, IconMenuElement, MenuBase
-from data.draw import draw_bluetooth_icon, draw_start_icon, draw_volume_icon, cross, check, draw_loading_frames
+from data.draw import *
 from bluetooth_headset.model import Device
 from config_manager import get_config_value
 from settings import *
@@ -45,11 +45,13 @@ class MainMenu(MenuBase):
     root_menu: Menu
     bluetooth_menu: Menu
     volume_menu: Menu
+    phone_menu: Menu
 
     state: int
     ns: int
 
     bt_device: Device | None
+    robot_controller: any  # 機器人控制器引用
 
     loading_frames: list[Image]
     is_loading: bool
@@ -59,12 +61,16 @@ class MainMenu(MenuBase):
     navigation_timer: threading.Timer  # 延遲重置 is_navigating
     oled_lock: threading.Lock  # OLED 訪問鎖
 
-    def __init__(self, tester_func: Callable[[], int], *args, **kwargs) -> None:
+    def __init__(self, tester_func: Callable[[], int], robot_controller=None, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
+        
+        self.robot_controller = robot_controller
+        
         root_ele = [
             IconMenuElement(draw_start_icon(), tester_func, 'start'),
             IconMenuElement(draw_bluetooth_icon(), bluetooth_enter_callback, 'bluetooth'),
-            IconMenuElement(draw_volume_icon(), volume_enter_callback, 'volume')
+            IconMenuElement(draw_volume_icon(), volume_enter_callback, 'volume'),
+            IconMenuElement(draw_phone_icon(), self.phone_status_callback, 'phone')
         ]
         self.root_menu = Menu(root_ele, SCREEN_HEIGHT)
 
@@ -73,8 +79,13 @@ class MainMenu(MenuBase):
         volume_ele = [
             TextMenuElement(f'{p}%', wrap_volume_select_callback(self, p)) for p in range(0, 101, 5)
         ]
-
         self.volume_menu = Menu(volume_ele, MENU_TEXT_HEIGHT)
+
+        # 手機狀態選單
+        phone_ele = [
+            TextMenuElement("Waiting for connection...", lambda: MENU_STATE_ROOT)
+        ]
+        self.phone_menu = Menu(phone_ele, MENU_TEXT_HEIGHT)
 
         self.state = MENU_STATE_ROOT
         self.ns = MENU_STATE_ROOT
@@ -87,13 +98,26 @@ class MainMenu(MenuBase):
         self.is_navigating = False
         self.navigation_timer = None
         self.oled_lock = threading.Lock()
-        default_device = Device('default', get_config_value('HEADPHONE_DEVICE_MAC') or 'none')
         
+        # 嘗試連接預設設備
+        default_device = Device('default', get_config_value('HEADPHONE_DEVICE_MAC') or 'none')
         connect_result = self.bluetooth.connect_bt_device(default_device)
         if connect_result:
             self.bt_device = default_device
         
         print(f'Connect to default device: {connect_result}')
+
+    def phone_status_callback(self) -> int:
+        """手機狀態回調"""
+        if self.robot_controller and self.robot_controller.phone_connected:
+            return MENU_STATE_ROOT  # 如果手機已連線，顯示連線狀態
+        else:
+            # 顯示等待連線訊息
+            return MENU_STATE_ROOT
+
+    def is_phone_connected(self) -> bool:
+        """檢查手機是否已連線"""
+        return self.robot_controller and self.robot_controller.phone_connected
 
     def start_bluetooth_update(self):
         """啟動後台線程，每 3 秒更新藍牙設備列表"""
@@ -200,10 +224,24 @@ class MainMenu(MenuBase):
             raise ValueError(f'Unknown state: {self.state}')
         return r
 
+    def show_phone_status(self):
+        """顯示手機連線狀態"""
+        
+        if self.is_phone_connected():
+            # 顯示手機已連線
+            return draw_phone_connected_icon()
+        return draw_phone_icon()
+
     def loop(self):
         _LOGGER.info(f'Enter loop with cs: {self.state}, ns: {self.ns}')
-        if self.bt_device is None:
-            _LOGGER.debug('Not connected to device')
+        
+        # 如果手機已連線且正在測試，不處理按鈕輸入
+        if self.is_phone_connected() and self.robot_controller.test_in_progress:
+            return
+        
+        # 檢查設備連線狀態
+        if self.bt_device is None and not self.is_phone_connected():
+            _LOGGER.debug('Not connected to device or phone')
             if self.state != MENU_STATE_BT and self.ns != MENU_STATE_BT:
                 self.ns = MENU_STATE_ROOT
                 self.root_menu.select_index = 1
@@ -227,11 +265,30 @@ class MainMenu(MenuBase):
         current_menu = self._current_menu()
         _LOGGER.debug(f'Selected index: {current_menu.select_index}')
 
-        if self.state == MENU_STATE_ROOT and current_menu.select_index == 1:
-            if self.bt_device is None:
-                current_menu.item_list[1].img = cross(draw_bluetooth_icon())
-            else:
-                current_menu.item_list[1].img = check(draw_bluetooth_icon())
+        # 更新圖示狀態
+        if self.state == MENU_STATE_ROOT:
+            # 更新藍牙圖示
+            if current_menu.select_index == 1:
+                if self.bt_device is None:
+                    current_menu.item_list[1].img = cross(draw_bluetooth_icon())
+                else:
+                    current_menu.item_list[1].img = check(draw_bluetooth_icon())
+            
+            # 更新手機圖示
+            if current_menu.select_index == 3:
+                if self.is_phone_connected():
+                    current_menu.item_list[3].img = check(draw_phone_connected_icon())
+                else:
+                    current_menu.item_list[3].img = draw_phone_icon()
+
+        # 如果手機已連線且不在測試中，顯示手機狀態
+        if self.is_phone_connected() and not self.robot_controller.test_in_progress:
+            with self.oled_lock:
+                self.oled.clear()
+                self.oled.set_img(self.show_phone_status())
+                self.oled.display()
+            time.sleep(0.5)
+            return
 
         with self.oled_lock:  # 保護 OLED 訪問
             self.oled.clear()
@@ -249,6 +306,12 @@ class MainMenu(MenuBase):
         if callee is None:
             raise ValueError(f'Unknown btn: {btn}')
         else:
+            # 如果手機已連線，禁用開始測試按鈕
+            if (btn == BTN_CONFIRM and self.state == MENU_STATE_ROOT and 
+                current_menu.select_index == 0 and self.is_phone_connected()):
+                _LOGGER.info("測試被手機控制，忽略按鈕操作")
+                return
+                
             if btn in (BTN_UP, BTN_DOWN):
                 self.is_navigating = True
                 _LOGGER.debug("Navigation started, pausing bluetooth updates")
