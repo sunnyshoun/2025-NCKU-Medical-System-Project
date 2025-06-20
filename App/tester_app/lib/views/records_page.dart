@@ -9,13 +9,11 @@ import '../models/user_models.dart';
 class VisionRecordsWidget extends StatefulWidget {
   final GeneralStateModel generalStates;
   final RecordsStateModel recordsStates;
-  final RecordController controller;
 
   const VisionRecordsWidget({
     super.key,
     required this.generalStates,
     required this.recordsStates,
-    required this.controller,
   });
 
   @override
@@ -23,41 +21,41 @@ class VisionRecordsWidget extends StatefulWidget {
 }
 
 class _VisionRecordsWidgetState extends State<VisionRecordsWidget> {
+  late RecordController _controller;
+
   @override
   void initState() {
     log('init records page');
     super.initState();
 
     final states = widget.recordsStates;
-    final controller = widget.controller;
-
-    controller.searchController.text = states.searchText;
-    controller.addSearchListener(
-      () => setState(() {
-        states.searchText = controller.searchController.text;
-      }),
+    _controller = RecordController(
+      generalStates: widget.generalStates,
+      context: context,
+      recordsStates: widget.recordsStates,
     );
 
+    _controller.searchController.text = states.searchText;
+    _controller.addSearchListener(
+      () => setState(() {
+        states.searchText = _controller.searchController.text;
+      }),
+    );
+    _controller.addFetchListener(() {
+      setState(() {});
+    });
+
     // fetch records
-    controller.fetchRecords();
+    _controller.fetchRecords();
   }
 
   @override
   Widget build(BuildContext context) {
     final generalStates = widget.generalStates;
     final t = AppLocalizations(generalStates.locale);
-    final controller = widget.controller;
-    controller.addSearchListener(
-      () => setState(
-        () =>
-            widget.recordsStates.searchText = controller.searchController.text,
-      ),
-    );
-    controller.addFetchListener(() {
-      setState(() {});
-    });
+    
     List<VisionRecord> sortedFilteredRecords =
-        controller.sortedFilteredRecords();
+        _controller.sortedFilteredRecords();
 
     return SafeArea(
       child: Column(
@@ -83,7 +81,7 @@ class _VisionRecordsWidgetState extends State<VisionRecordsWidget> {
                 border: const OutlineInputBorder(),
                 hintText: t.get('input_date_hint'),
               ),
-              controller: controller.searchController,
+              controller: _controller.searchController,
               style: TextStyle(fontSize: generalStates.fontSize),
             ),
           ),
@@ -110,10 +108,11 @@ class _VisionRecordsWidgetState extends State<VisionRecordsWidget> {
               icon: const Icon(Icons.replay_outlined),
               onPressed: () {
                 log('refresh record');
-                controller.fetchRecords();
+                _controller.fetchRecords();
               },
             ),
           ),
+          const SizedBox(height: 16),
         ],
       ),
     );

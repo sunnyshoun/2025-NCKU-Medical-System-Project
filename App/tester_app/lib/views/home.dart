@@ -2,7 +2,6 @@ import 'dart:developer';
 import 'package:flutter/material.dart';
 import 'package:tester_app/controllers/cache_manager.dart';
 import 'package:tester_app/controllers/chat_controller.dart';
-import 'package:tester_app/controllers/record_controller.dart';
 import 'package:tester_app/controllers/settings_controller.dart';
 import 'package:tester_app/models/state_models.dart';
 import 'package:tester_app/views/chat_page.dart';
@@ -60,11 +59,6 @@ class _HomePageState extends State<HomePage> {
           VisionRecordsWidget(
             generalStates: generalStates,
             recordsStates: homeStates,
-            controller: RecordController(
-              generalStates: generalStates,
-              context: context,
-              recordsStates: homeStates,
-            ),
           ),
           RemotePage(states: generalStates),
           SettingsPage(
