@@ -2,9 +2,9 @@ import 'dart:developer';
 
 import 'package:flutter/material.dart';
 import 'package:tester_app/configs/app_localizations.dart';
-import 'package:tester_app/controllers/bluetooth_controller.dart';
+import 'package:tester_app/controllers/remote/bluetooth_controller.dart';
 import 'package:tester_app/models/state_models.dart';
-import 'package:tester_app/views/bluetooth_page.dart';
+import 'package:tester_app/views/remote/bluetooth_page.dart';
 
 class RemotePage extends StatefulWidget {
   final GeneralStateModel states;
