@@ -5,7 +5,7 @@ import 'package:tester_app/controllers/chat_controller.dart';
 import 'package:tester_app/controllers/settings_controller.dart';
 import 'package:tester_app/models/state_models.dart';
 import 'package:tester_app/views/chat_page.dart';
-import 'package:tester_app/views/remote_page.dart';
+import 'package:tester_app/views/remote/remote_page.dart';
 import 'package:tester_app/views/settings.dart';
 import 'package:tester_app/views/records_page.dart';
 import 'package:tester_app/configs/app_localizations.dart';

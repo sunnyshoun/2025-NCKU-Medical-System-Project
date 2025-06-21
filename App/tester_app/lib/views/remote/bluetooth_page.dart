@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:tester_app/configs/app_localizations.dart';
-import 'package:tester_app/controllers/bluetooth_controller.dart';
+import 'package:tester_app/controllers/remote/bluetooth_controller.dart';
 import 'package:tester_app/models/state_models.dart';
 
 class BluetoothPage extends StatefulWidget {
