@@ -119,6 +119,13 @@ class RobotController:
             if self.current_mode != "phone":
                 self.logger.info("切換到手機模式")
                 self.current_mode = "phone"
+                
+                if self.menu:
+                    self.menu.state = MENU_STATE_ROOT
+                    self.menu.ns = MENU_STATE_ROOT
+                    await self.menu.stop_bluetooth_update()
+                    self.logger.debug("選單狀態已重置")
+                
                 await self.show_phone_connected_status()
     
     async def switch_to_button_mode(self):
@@ -126,6 +133,12 @@ class RobotController:
             if self.current_mode != "button":
                 self.logger.info("切換到按鈕模式")
                 self.current_mode = "button"
+                
+                if self.menu:
+                    self.menu.state = MENU_STATE_ROOT
+                    self.menu.ns = MENU_STATE_ROOT
+                    self.logger.debug("選單狀態已重置")
+                
                 if self.test_coordinator:
                     await self.test_coordinator.stop_test()
     

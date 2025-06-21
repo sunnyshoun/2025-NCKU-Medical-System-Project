@@ -157,7 +157,7 @@ class MainMenu(MenuBase):
             bluetooth_ele = [
                 TextMenuElement(
                     text=device.device_name,
-                    call_back=lambda: wrap_bluetooth_select_callback(device, self)
+                    call_back=lambda device=device: wrap_bluetooth_select_callback(device, self)
                 ) for device in bluetooth_device_list
             ]
 
