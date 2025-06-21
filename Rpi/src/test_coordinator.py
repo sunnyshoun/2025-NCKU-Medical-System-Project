@@ -154,11 +154,11 @@ class TestCoordinator:
             def notify_phone():
                 try:
                     loop = asyncio.get_event_loop()
-                    loop.create_task(self.phone_handler.notify_ready_for_direction())
+                    loop.create_task(self.phone_handler.notify_ready_for_input())
                 except RuntimeError:
                     # 如果沒有事件循環，創建新線程執行
                     async def async_notify():
-                        await self.phone_handler.notify_ready_for_direction()
+                        await self.phone_handler.notify_ready_for_input()
                     
                     threading.Thread(
                         target=lambda: asyncio.run(async_notify()),
