@@ -1,45 +1,50 @@
-# EyeDwell 機器人通訊協議（最終簡化版）
+# EyeDwell 機器人通訊協議（更新版）
 
 ## 概述
 
-機器人和手機之間只在4個關鍵時機點進行通訊，完全移除音檔傳輸，保持協議極簡高效。
+機器人和手機之間透過 BLE 進行通訊，使用兩個特徵值通道：
+- **COMMAND_CHAR_UUID**: 手機 → 機器人的指令通道
+- **DATA_CHAR_UUID**: 機器人 → 手機的數據通道
 
 ## BLE 服務資訊
 
-- **服務名稱**: "EyeDwell_Robot"  
+- **服務名稱**: "EyeDwell"  
 - **服務 UUID**: "12345678-abcd-1234-5678-123456789abc"
+- **指令特徵 UUID**: "12345678-abcd-1234-5678-123456789ab1" (COMMAND_CHAR_UUID)
+- **數據特徵 UUID**: "12345678-abcd-1234-5678-123456789ab2" (DATA_CHAR_UUID)
 
-## 4個關鍵通訊時機點
+## 通訊協議
 
-### 1. 連線狀態變化
+### 手機 → 機器人 (COMMAND_CHAR_UUID)
 
-#### 連線後（自動處理）
+#### 1. 連線指令
+```json
+{
+  "type": "connect"
+}
+```
+
 **機器人行為**:
 - 停止板載按鈕操控
 - 切換到手機控制模式  
 - OLED 顯示手機圖示（使用 `draw_phone_icon()`）
 
-#### 斷線後（自動處理）
+#### 2. 斷線指令
+```json
+{
+  "type": "disconnect"
+}
+```
+
 **機器人行為**:
 - 立刻回到板載按鈕操作的主選單
 - 停止當前測試（如果有的話）
 - OLED 回到主選單顯示
 
-### 2. 開始測試（手機 → 機器人）
-
+#### 3. 開始測試
 ```json
 {
   "type": "start_test"
-}
-```
-
-**機器人回應**:
-```json
-{
-  "type": "test_started", 
-  "data": {
-    "message": "測試已開始"
-  }
 }
 ```
 
@@ -48,41 +53,54 @@
 - 不播放任何音檔
 - OLED 清空或顯示測試狀態
 
-### 3. 等待使用者輸入方向（機器人 → 手機）
-
-當機器人移動到測試位置並準備好時：
-
-```json
-{
-  "type": "ready_for_direction",
-  "data": {
-    "message": "機器人已定位完成，請選擇開口方向",
-    "test_info": {
-      "degree": 0.5,
-      "thickness": 4
-    }
-  }
-}
-```
-
-**手機回應（方向選擇）**:
+#### 4. 方向回應
 ```json
 {
   "type": "direction_response",
-  "direction": 0  // 0=右, 1=上, 2=左, 3=下
+  "direction": 2
 }
 ```
 
-### 4. 測試結束（機器人 → 手機）
+**參數說明**:
+- `direction`: 開口方向 (0=右, 1=上, 2=左, 3=下)
 
+#### 5. 語音識別回應
+```json
+{
+  "type": "stt_response",
+  "text": "上面"
+}
+```
+
+**參數說明**:
+- `text`: 語音識別結果文字
+
+### 機器人 → 手機 (DATA_CHAR_UUID)
+
+#### 1. 準備接收輸入
+```json
+{
+  "type": "ready_for_input"
+}
+```
+
+當機器人移動到測試位置並準備好接收使用者輸入時發送。
+
+**手機行為**:
+- 啟用方向選擇UI
+- 或啟用語音輸入功能
+- 顯示測試圖案或相關提示
+
+#### 2. 測試完成
 ```json
 {
   "type": "test_complete",
-  "data": {
-    "vision_score": 0.8
-  }
+  "score": 1.2
 }
 ```
+
+**參數說明**:
+- `score`: 視力分數
 
 **機器人行為**:
 - 發送測試結果到手機
@@ -90,62 +108,102 @@
 - OLED 直接回到手機圖案（使用 `draw_phone_icon()`）
 - 準備進行下一次測試
 
-## 手機端需實現的功能
+## 手機端實現範例
 
 ### 1. BLE 連線管理
 ```dart
-// 掃描並連線
-await bleManager.scanAndConnect("EyeDwell_Robot");
-
-// 監聽連線狀態
-bleManager.onConnectionChanged = (connected) {
-  if (connected) {
-    // 顯示連線成功，準備開始測試
-    showTestInterface();
-  } else {
-    // 顯示斷線，回到掃描畫面
-    showScanInterface();
+class BLEManager {
+  // 掃描並連線
+  Future<void> scanAndConnect(String deviceName) async {
+    // 掃描設備邏輯
+    await connect();
+    
+    // 連線成功後發送連線指令
+    await sendCommand({"type": "connect"});
   }
-};
+  
+  // 發送指令到機器人
+  Future<void> sendCommand(Map<String, dynamic> command) async {
+    String jsonString = jsonEncode(command);
+    await commandCharacteristic.write(utf8.encode(jsonString));
+  }
+  
+  // 監聽來自機器人的數據
+  void listenToData() {
+    dataCharacteristic.value.listen((data) {
+      String jsonString = utf8.decode(data);
+      Map<String, dynamic> message = jsonDecode(jsonString);
+      handleIncomingMessage(message);
+    });
+  }
+  
+  // 處理接收到的訊息
+  void handleIncomingMessage(Map<String, dynamic> message) {
+    switch (message['type']) {
+      case 'ready_for_input':
+        onReadyForInput?.call();
+        break;
+      case 'test_complete':
+        onTestComplete?.call(message['score']);
+        break;
+    }
+  }
+  
+  // 斷線
+  Future<void> disconnect() async {
+    await sendCommand({"type": "disconnect"});
+    await bluetoothConnection.disconnect();
+  }
+}
 ```
 
 ### 2. 測試控制流程
 ```dart
-// 開始測試
-void startTest() {
-  bleManager.sendCommand({
-    "type": "start_test"
-  });
+class TestController {
+  final BLEManager bleManager;
   
-  // 顯示等待狀態
-  showWaitingForRobot();
-}
-
-// 監聽準備選擇方向的訊號
-bleManager.onReadyForDirection = (data) {
-  // 啟用方向選擇UI
-  enableDirectionSelector();
-  showDirectionSelector();
-};
-
-// 發送方向選擇
-void selectDirection(int direction) {
-  bleManager.sendCommand({
-    "type": "direction_response", 
-    "direction": direction
-  });
+  TestController(this.bleManager) {
+    bleManager.onReadyForInput = onReadyForInput;
+    bleManager.onTestComplete = onTestComplete;
+  }
   
-  // 禁用UI，等待下一次輸入
-  disableDirectionSelector();
-  showWaitingForNextRound();
+  // 開始測試
+  Future<void> startTest() async {
+    await bleManager.sendCommand({"type": "start_test"});
+    updateUI(TestState.testing);
+  }
+  
+  // 當機器人準備接收輸入時
+  void onReadyForInput() {
+    updateUI(TestState.waitingInput);
+    enableDirectionSelector();
+  }
+  
+  // 發送方向選擇
+  Future<void> selectDirection(int direction) async {
+    await bleManager.sendCommand({
+      "type": "direction_response", 
+      "direction": direction
+    });
+    
+    disableDirectionSelector();
+    updateUI(TestState.testing);
+  }
+  
+  // 發送語音識別結果
+  Future<void> sendSTTResponse(String text) async {
+    await bleManager.sendCommand({
+      "type": "stt_response",
+      "text": text
+    });
+  }
+  
+  // 測試完成回調
+  void onTestComplete(double score) {
+    showTestResult(score);
+    updateUI(TestState.showingResult);
+  }
 }
-
-// 監聽測試結果
-bleManager.onTestComplete = (result) {
-  showTestResult(result.visionScore);
-  // 提供重新測試選項
-  showRetestOption();
-};
 ```
 
 ### 3. UI 狀態管理
@@ -154,7 +212,7 @@ enum TestState {
   disconnected,    // 未連線
   connected,       // 已連線，等待開始測試
   testing,         // 測試進行中
-  waitingInput,    // 等待使用者輸入方向
+  waitingInput,    // 等待使用者輸入
   showingResult    // 顯示測試結果
 }
 
@@ -178,7 +236,7 @@ class TestStateManager {
         showWaitingInterface();
         break;
       case TestState.waitingInput:
-        showDirectionSelector();
+        showInputInterface(); // 方向選擇或語音輸入
         break;
       case TestState.showingResult:
         showResultInterface();
@@ -191,17 +249,18 @@ class TestStateManager {
 ## 測試流程圖
 
 ```
-手機連線 → 機器人切換模式，OLED顯示手機圖示
+手機掃描並連線 → 發送 connect 指令 → 機器人切換模式，OLED顯示手機圖示
    ↓
-手機發送開始測試
+手機發送 start_test
    ↓  
 機器人開始測試流程（使用預設語言，不播放音檔）
    ↓
-[重複] 機器人移動定位 → 通知手機準備輸入 → 手機顯示方向選擇UI → 手機回應方向
+[重複] 機器人移動定位 → 發送 ready_for_input → 手機顯示輸入UI → 
+手機發送 direction_response 或 stt_response
    ↓
-測試完成 → 機器人發送結果到手機 → OLED直接回到手機圖案（不顯示結果）
+測試完成 → 機器人發送 test_complete → OLED直接回到手機圖案
    ↓
-手機顯示結果，可選擇重新測試或斷線
+手機顯示結果，可選擇重新測試或發送 disconnect 指令
 ```
 
 ## 機器人端圖案繪製
@@ -250,25 +309,27 @@ oled.display()
 ## 錯誤處理
 
 ### 超時處理
-- 等待手機方向回應：30秒超時
+- 等待手機輸入回應：30秒超時，超時後重送
 - BLE 連線檢測：每2秒檢查一次
 
 ### 異常狀況
 - 手機斷線：立即停止測試，回到按鈕模式，OLED回到主選單
 - 測試失敗：發送錯誤訊息到手機
 - 機器人硬體故障：發送錯誤狀態到手機
+- JSON 解析錯誤：忽略無效訊息，記錄日誌
 
 ### 狀態恢復
 - 測試結束後，OLED自動回到手機圖案
 - 斷線後，OLED自動回到主選單
 - 重新連線後，OLED自動顯示手機圖案
 
-## 主要簡化優勢
+## 協議特點
 
-1. **極簡通訊** - 只有4個通訊時機點
-2. **無音檔傳輸** - 完全移除音檔處理複雜度
-3. **清晰的UI狀態** - 手機端可明確知道當前狀態
-4. **統一的圖案繪製** - 所有圖案由 draw.py 統一處理
-5. **自動狀態恢復** - 測試結束或斷線後自動回到適當狀態
+1. **明確的連線管理** - 使用 connect/disconnect 指令明確控制連線狀態
+2. **雙重輸入支持** - 支援觸控方向選擇和語音識別兩種輸入方式
+3. **簡化的消息格式** - 使用統一的 JSON 格式，易於解析和調試
+4. **清晰的狀態轉換** - 手機端可明確知道當前測試狀態
+5. **統一的圖案繪製** - 所有圖案由 draw.py 統一處理
+6. **自動狀態恢復** - 測試結束或斷線後自動回到適當狀態
 
-這個最終簡化版本將通訊協議精簡到最核心的功能，大幅提升了系統的穩定性和可維護性。
+這個更新版本的協議與你的實際藍牙接口完全一致，提供了清晰的通訊架構和實現指南。
