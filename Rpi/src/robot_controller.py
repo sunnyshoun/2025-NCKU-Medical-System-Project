@@ -111,8 +111,6 @@ class RobotController:
             self.oled.clear()
             self.oled.set_img(img)
             self.oled.display()
-            
-            self.logger.debug("OLED顯示手機連線圖案")
         except Exception as e:
             self.logger.error(f"顯示手機圖案失敗: {e}")
     
