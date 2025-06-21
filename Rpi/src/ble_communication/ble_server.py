@@ -335,7 +335,6 @@ class BLEServer:
         self.data_char = None
         self.advertisement = None
         self.pairing_agent = None
-        self.is_connected = False
         self.connected_device_path = None
         self.on_command_received: Optional[Callable[[str], Any]] = None
         self.monitor_task = None
@@ -614,7 +613,7 @@ class BLEServer:
             logger.error(f"設置設備屬性錯誤: {e}")
 
     async def send_data(self, data: bytes) -> bool:
-        if not self.is_connected or not self.data_char:
+        if not self.data_char:
             return False
         if len(data) > 500:
             data = data[:500]
