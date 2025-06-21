@@ -1,371 +1,620 @@
 import asyncio
 import logging
-import json
-import time
-from typing import Optional, Callable
-from dbus_fast import BusType, Variant, Message
+from typing import Optional, Callable, Dict, Any
+from dbus_fast import BusType, Variant, Message, MessageType, PropertyAccess, RequestNameReply
 from dbus_fast.aio import MessageBus
-from dbus_fast.service import ServiceInterface, method, signal
+from dbus_fast.service import ServiceInterface, method, dbus_property, signal
+from dbus_fast.introspection import Node
 
 logger = logging.getLogger("BLE_Server")
 
+# D-Bus 和 BlueZ 常數
 BLUEZ_SERVICE = "org.bluez"
+ADAPTER_PATH = "/org/bluez/hci0"
 GATT_MANAGER_IFACE = "org.bluez.GattManager1"
 GATT_SERVICE_IFACE = "org.bluez.GattService1"
 GATT_CHARACTERISTIC_IFACE = "org.bluez.GattCharacteristic1"
-GATT_DESCRIPTOR_IFACE = "org.bluez.GattDescriptor1"
 DBUS_PROPERTIES_IFACE = "org.freedesktop.DBus.Properties"
 DBUS_OBJECT_MANAGER_IFACE = "org.freedesktop.DBus.ObjectManager"
-ADAPTER_PATH = "/org/bluez/hci0"
+ADAPTER_IFACE = "org.bluez.Adapter1"
+DEVICE_IFACE = "org.bluez.Device1"
+ADVERTISING_MANAGER_IFACE = "org.bluez.LEAdvertisingManager1"
+ADVERTISEMENT_IFACE = "org.bluez.LEAdvertisement1"
+AGENT_MANAGER_IFACE = "org.bluez.AgentManager1"
+AGENT_IFACE = "org.bluez.Agent1"
 
-class GattApplication(ServiceInterface):
-    def __init__(self, bus, path):
-        super().__init__(DBUS_OBJECT_MANAGER_IFACE)
-        self.bus = bus
-        self.path = path
-        self.services = {}
-        self.next_index = 0
+# EyeDwell UUID
+SERVICE_UUID = "12345678-abcd-1234-5678-123456789abc"
+COMMAND_CHAR_UUID = "12345678-abcd-1234-5678-123456789ab1"
+DATA_CHAR_UUID = "12345678-abcd-1234-5678-123456789ab2"
+RESPONSE_CHAR_UUID = "12345678-abcd-1234-5678-123456789ab3"
+
+# 手機設備辨識
+PHONE_DEVICE_CLASSES = {
+    0x05A020,  # Phone - Cellular
+    0x05A024,  # Phone - Cordless
+    0x05A028,  # Phone - Smartphone
+}
+PHONE_KEYWORDS = ["phone", "iphone", "android", "smartphone", "mobile"]
+PHONE_UUIDS = {
+    "00001101-0000-1000-8000-00805f9b34fb",  # Serial Port Profile (SPP)
+    "0000110e-0000-1000-8000-00805f9b34fb",  # Audio/Video Remote Control Profile
+    "0000111e-0000-1000-8000-00805f9b34fb",  # Hands-Free Profile
+}
+
+
+class PairingAgent(ServiceInterface):
+    """修正的配對代理，處理現代設備的配對過程"""
+    
+    def __init__(self):
+        super().__init__(AGENT_IFACE)
+        self.path = "/org/eyedwell/agent"
 
     @method()
-    def GetManagedObjects(self):
-        response = {}
+    def Release(self):
+        """配對代理被釋放時調用"""
+        logger.debug("配對代理已釋放")
+
+    @method()
+    def AuthorizeService(self, device: "o", uuid: "s"):
+        """授權服務連接"""
+        logger.info(f"設備 {device} 請求服務 {uuid}")
+        
+        # 定義音訊和通話相關的 UUID 列表，包括 aptX 相關 UUID
+        AUDIO_AND_CALL_RELATED_UUIDS = {
+            "0000111e-0000-1000-8000-00805f9b34fb",  # Hands-Free Profile (HFP)
+            "0000111f-0000-1000-8000-00805f9b34fb",  # Hands-Free Audio Gateway
+            "0000110a-0000-1000-8000-00805f9b34fb",  # Audio Source (A2DP)
+            "0000110b-0000-1000-8000-00805f9b34fb",  # Audio Sink (A2DP)
+            "0000110d-0000-1000-8000-00805f9b34fb",  # Advanced Audio Distribution Profile (A2DP)
+            "0000110e-0000-1000-8000-00805f9b34fb",  # Audio/Video Remote Control Profile (AVRCP)
+        }
+        
+        # 檢查請求的 UUID 是否為音訊或通話相關
+        if uuid.lower() in AUDIO_AND_CALL_RELATED_UUIDS:
+            logger.info(f"拒絕音訊或通話相關服務 {uuid} 的配對請求")
+            raise Exception("音訊或通話服務未授權")
+        
+        # 允許你的 EyeDwell 服務 UUID
+        if uuid.lower() == SERVICE_UUID.lower():
+            logger.info(f"授權 EyeDwell 服務 {uuid}")
+            return
+        
+        # 如果是其他未知的 UUID，可以選擇拒絕或允許
+        logger.warning(f"未知服務 {uuid}，默認拒絕")
+        raise Exception("未知服務未授權")
+
+    @method()
+    def RequestPinCode(self, device: "o") -> "s":
+        """請求 PIN 碼（舊式配對）- 通常不會被調用"""
+        logger.info(f"設備 {device} 請求 PIN 碼（舊式配對）")
+        return "0000"
+
+    @method()
+    def DisplayPinCode(self, device: "o", pincode: "s"):
+        """顯示 PIN 碼"""
+        logger.info(f"設備 {device} 的 PIN 碼: {pincode}")
+
+    @method()
+    def RequestPasskey(self, device: "o") -> "u":
+        """請求密鑰（6位數字）- 較少使用"""
+        logger.info(f"設備 {device} 請求密鑰")
+        return 123456
+
+    @method()
+    def DisplayPasskey(self, device: "o", passkey: "u", entered: "q"):
+        """顯示密鑰進度"""
+        logger.info(f"設備 {device} 的密鑰: {passkey:06d} (已輸入: {entered})")
+
+    @method()
+    def RequestConfirmation(self, device: "o", passkey: "u"):
+        """請求確認配對 - 這是現代設備最常用的方法"""
+        logger.info(f"自動確認設備 {device} 的配對，密鑰: {passkey:06d}")
+        # 自動確認配對
+        return
+
+    @method()
+    def RequestAuthorization(self, device: "o"):
+        """請求授權連接"""
+        logger.info(f"自動授權設備 {device} 連接")
+        # 自動授權連接
+        return
+
+    @method()
+    def Cancel(self):
+        """取消配對過程"""
+        logger.info("配對過程被取消")
+
+    def get_path(self):
+        return self.path
+
+
+class Advertisement(ServiceInterface):
+    def __init__(self, index: int, device_name: str = "EyeDwell"):
+        super().__init__(ADVERTISEMENT_IFACE)
+        self.path = f"/org/eyedwell/advertisement{index}"
+        self.device_name = device_name
+
+    @dbus_property(access=PropertyAccess.READ)
+    def Type(self) -> "s":
+        return "peripheral"
+
+    @dbus_property(access=PropertyAccess.READ)
+    def LocalName(self) -> "s":
+        return self.device_name
+
+    @dbus_property(access=PropertyAccess.READ)
+    def Appearance(self) -> "q":
+        return 0x0080
+
+    @dbus_property(access=PropertyAccess.READ)
+    def ServiceUUIDs(self) -> "as":
+        return [SERVICE_UUID]
+
+    @dbus_property(access=PropertyAccess.READ)
+    def Includes(self) -> "as":
+        return ["tx-power"]
+
+    @method()
+    def Release(self):
+        logger.debug("廣告已釋放")
+
+    def get_path(self):
+        return self.path
+
+
+class GattApplication(ServiceInterface):
+    def __init__(self, bus):
+        super().__init__(DBUS_OBJECT_MANAGER_IFACE)
+        self.bus = bus
+        self.path = "/org/eyedwell/app"
+        self.services = {}
+
+    @method()
+    async def GetManagedObjects(self) -> "a{oa{sa{sv}}}":
+        result = {}
+        logger.debug("GetManagedObjects 被調用")
+        
         for path, service in self.services.items():
-            response[path] = service.get_properties()
-            # 添加特徵值
+            logger.debug(f"處理服務路徑: {path}")
+            # 手動構建服務屬性
+            service_props = {
+                "UUID": Variant("s", service.UUID),
+                "Primary": Variant("b", service.Primary),
+                "Device": Variant("o", service.Device),
+            }
+            result[path] = {GATT_SERVICE_IFACE: service_props}
+            
+            # 獲取特徵屬性
             for char_path, char in service.characteristics.items():
-                response[char_path] = char.get_properties()
-        return response
+                logger.debug(f"處理特徵路徑: {char_path}")
+                char_props = {
+                    "Service": Variant("o", char.Service),
+                    "UUID": Variant("s", char.UUID),
+                    "Flags": Variant("as", char.Flags),
+                    "Value": Variant("ay", char.Value),
+                    "Notifying": Variant("b", char.Notifying),
+                }
+                result[char_path] = {GATT_CHARACTERISTIC_IFACE: char_props}
+        
+        logger.debug(f"GetManagedObjects 返回: {result}")
+        return result
 
     def add_service(self, service):
-        service.set_index(self.next_index)
-        self.services[service.get_path()] = service
-        self.next_index += 1
+        self.services[service.path] = service
 
-class GattService(ServiceInterface):
-    def __init__(self, bus, index, uuid, primary=True):
-        self.bus = bus
-        self.index = index
-        self.uuid = uuid
-        self.primary = primary
-        self.characteristics = {}
-        self.path = f"/org/example/service{index:04d}"
+
+class EyeDwellGattService(ServiceInterface):
+    def __init__(self, bus):
         super().__init__(GATT_SERVICE_IFACE)
+        self.bus = bus
+        self.path = "/org/eyedwell/app/service0"
+        self.uuid = SERVICE_UUID
+        self.characteristics = {}
 
-    def get_properties(self):
-        return {
-            GATT_SERVICE_IFACE: {
-                'UUID': Variant('s', self.uuid),
-                'Primary': Variant('b', self.primary)
-            }
-        }
+    @dbus_property(access=PropertyAccess.READ)
+    def UUID(self) -> "s":
+        return self.uuid
 
-    def get_path(self):
-        return self.path
+    @dbus_property(access=PropertyAccess.READ)
+    def Primary(self) -> "b":
+        return True
 
-    def set_index(self, index):
-        self.index = index
-        self.path = f"/org/example/service{index:04d}"
+    @dbus_property(access=PropertyAccess.READ)
+    def Device(self) -> "o":
+        return ADAPTER_PATH
 
     def add_characteristic(self, characteristic):
-        characteristic.service = self
-        self.characteristics[characteristic.get_path()] = characteristic
+        self.characteristics[characteristic.path] = characteristic
 
-class GattCharacteristic(ServiceInterface):
-    def __init__(self, bus, index, uuid, flags, service):
+
+class EyeDwellCharacteristic(ServiceInterface):
+    def __init__(self, bus, uuid, flags, path, ble_server=None):
+        super().__init__(GATT_CHARACTERISTIC_IFACE)
         self.bus = bus
-        self.index = index
+        self.path = path
         self.uuid = uuid
         self.flags = flags
-        self.service = service
-        self.value = []
-        self.path = f"{service.path}/char{index:04d}"
-        
-        # 回調函數
-        self.read_callback = None
-        self.write_callback = None
-        
-        super().__init__(GATT_CHARACTERISTIC_IFACE)
+        self.value = bytearray()
+        self.ble_server = ble_server
+        self.service_path = "/org/eyedwell/app/service0"
+        self.notifying = False
 
-    def get_properties(self):
-        return {
-            GATT_CHARACTERISTIC_IFACE: {
-                'Service': Variant('o', self.service.get_path()),
-                'UUID': Variant('s', self.uuid),
-                'Flags': Variant('as', self.flags),
-                'Value': Variant('ay', self.value)
-            }
-        }
+    @dbus_property(access=PropertyAccess.READ)
+    def Service(self) -> "o":
+        return self.service_path
 
-    def get_path(self):
-        return self.path
+    @dbus_property(access=PropertyAccess.READ)
+    def UUID(self) -> "s":
+        return self.uuid
 
-    def set_value(self, value):
-        self.value = value
-        if 'notify' in self.flags:
-            self.PropertiesChanged(
-                GATT_CHARACTERISTIC_IFACE,
-                {'Value': Variant('ay', value)},
-                []
-            )
+    @dbus_property(access=PropertyAccess.READ)
+    def Flags(self) -> "as":
+        return self.flags
+
+    @dbus_property(access=PropertyAccess.READ)
+    def Value(self) -> "ay":
+        return self.value
+
+    @dbus_property(access=PropertyAccess.READ)
+    def Notifying(self) -> "b":
+        return self.notifying
+
+    def set_value(self, value: bytes):
+        self.value = bytearray(value)
+        if "notify" in self.flags and self.notifying:
+            self.PropertiesChanged(GATT_CHARACTERISTIC_IFACE, {"Value": Variant("ay", self.value), "Notifying": Variant("b", self.notifying)}, [])
 
     @signal()
     def PropertiesChanged(self, interface: "s", changed: "a{sv}", invalidated: "as"):
         pass
 
     @method()
-    def ReadValue(self, options: "a{sv}"):
-        logger.info(f"特徵值讀取請求: {self.uuid}")
-        if self.read_callback:
-            return self.read_callback()
+    async def ReadValue(self, options: "a{sv}") -> "ay":
         return self.value
 
     @method()
-    def WriteValue(self, value: "ay", options: "a{sv}"):
-        logger.info(f"特徵值寫入請求: {self.uuid}, 長度: {len(value)}")
-        self.value = value
-        if self.write_callback:
-            self.write_callback(bytes(value))
+    async def WriteValue(self, value: "ay", options: "a{sv}"):
+        self.value = bytearray(value)
+        await self.on_write(bytes(value))
 
     @method()
-    def StartNotify(self):
-        logger.info(f"開始通知: {self.uuid}")
-        return
+    async def StartNotify(self):
+        if "notify" not in self.flags:
+            raise Exception("Notify not supported")
+        self.notifying = True
+        self.PropertiesChanged(GATT_CHARACTERISTIC_IFACE, {"Notifying": Variant("b", True)}, [])
 
     @method()
-    def StopNotify(self):
-        logger.info(f"停止通知: {self.uuid}")
-        return
+    async def StopNotify(self):
+        self.notifying = False
+        self.PropertiesChanged(GATT_CHARACTERISTIC_IFACE, {"Notifying": Variant("b", False)}, [])
+
+    async def on_write(self, data: bytes):
+        pass
+
+
+class CommandCharacteristic(EyeDwellCharacteristic):
+    def __init__(self, bus, ble_server):
+        super().__init__(bus, COMMAND_CHAR_UUID, ["write"], "/org/eyedwell/app/service0/char0", ble_server)
+
+    async def on_write(self, data: bytes):
+        if self.ble_server and self.ble_server.on_command_received:
+            await self.ble_server.on_command_received(data.decode("utf-8"))
+
+
+class DataCharacteristic(EyeDwellCharacteristic):
+    def __init__(self, bus, ble_server):
+        super().__init__(bus, DATA_CHAR_UUID, ["read", "notify"], "/org/eyedwell/app/service0/char1", ble_server)
+
+
+class ResponseCharacteristic(EyeDwellCharacteristic):
+    def __init__(self, bus, ble_server):
+        super().__init__(bus, RESPONSE_CHAR_UUID, ["write"], "/org/eyedwell/app/service0/char2", ble_server)
+
+    async def on_write(self, data: bytes):
+        if self.ble_server and self.ble_server.on_response_received:
+            await self.ble_server.on_response_received(data.decode("utf-8"))
+
 
 class BLEServer:
-    # 視力測試機器人專用的 UUID
-    VISION_ROBOT_SERVICE_UUID = "12345678-abcd-1234-5678-123456789abc"
-    CONTROL_CHAR_UUID = "12345678-abcd-1234-5678-123456789ab1"  # 控制命令
-    DATA_CHAR_UUID = "12345678-abcd-1234-5678-123456789ab2"     # 數據傳輸
-    STATUS_CHAR_UUID = "12345678-abcd-1234-5678-123456789ab4"   # 狀態回報
-
     def __init__(self, device_name: str = "EyeDwell"):
         self.device_name = device_name
         self.bus: Optional[MessageBus] = None
-        self.is_connected = False
-        self.client_address = ""
-        
-        # GATT 應用程序和服務
-        self.app = None
-        self.service = None
-        self.control_char = None
         self.data_char = None
-        self.status_char = None
-        
-        # 回調函數
-        self.on_control_command: Optional[Callable[[str], None]] = None
-        self.on_data_received: Optional[Callable[[bytes], None]] = None
-        self.on_connection_changed: Optional[Callable[[bool], None]] = None
-        
-        # 測試狀態
-        self.test_active = False
-        self.waiting_for_response = False
+        self.advertisement = None
+        self.pairing_agent = None
+        self.is_connected = False
+        self.connected_device_path = None
+        self.on_command_received: Optional[Callable[[str], Any]] = None
+        self.on_response_received: Optional[Callable[[str], Any]] = None
+        self.on_connection_changed: Optional[Callable[[bool], Any]] = None
+        self.monitor_task = None
+        self.gatt_app = None
 
     async def start_server(self):
         try:
             await self._connect_dbus()
             await self._setup_adapter()
-            await self._setup_gatt_services()
-            await self._register_gatt_application()
+            await self._register_pairing_agent()
+            await self._create_gatt_services()
             await self._register_advertisement()
-            
-            logger.info(f"視力測試 BLE 服務器啟動: {self.device_name}")
-            asyncio.create_task(self._monitor_connections())
-            
+            await self._register_gatt_application()
+            self._start_connection_monitor()
+            logger.info("BLE 服務器啟動成功")
         except Exception as e:
-            logger.error(f"Failed to start BLE server: {e}")
+            logger.error(f"啟動失敗: {e}")
             await self.stop_server()
             raise
 
     async def stop_server(self):
         try:
+            if self.monitor_task:
+                self.monitor_task.cancel()
+                await self.monitor_task
+            await self._unregister_advertisement()
+            await self._unregister_gatt_application()
+            await self._unregister_pairing_agent()
             if self.bus:
-                await self._stop_advertisement()
-                await self._unregister_gatt_application()
                 self.bus.disconnect()
                 self.bus = None
-            logger.info("BLE server stopped")
+            logger.info("BLE 服務器已停止")
         except Exception as e:
-            logger.error(f"Error stopping server: {e}")
+            logger.error(f"停止失敗: {e}")
 
     async def _connect_dbus(self):
-        self.bus = await MessageBus(bus_type=BusType.SYSTEM).connect()
+        try:
+            self.bus = await MessageBus(bus_type=BusType.SYSTEM).connect()
+            result = await self.bus.request_name("org.eyedwell.BLEServer")
+            if result == RequestNameReply.PRIMARY_OWNER:
+                logger.info("D-Bus 名稱 org.eyedwell.BLEServer 已成功請求")
+            elif result == RequestNameReply.IN_QUEUE:
+                logger.warning("D-Bus 名稱 org.eyedwell.BLEServer 已在隊列中，等待其他進程釋放")
+                raise Exception("D-Bus 名稱已在隊列中，請檢查是否有其他實例運行")
+            elif result == RequestNameReply.EXISTS:
+                logger.error("D-Bus 名稱 org.eyedwell.BLEServer 已被其他進程佔用")
+                raise Exception("D-Bus 名稱已被佔用，請終止其他實例")
+            elif result == RequestNameReply.ALREADY_OWNER:
+                logger.warning("D-Bus 名稱 org.eyedwell.BLEServer 已被當前進程擁有")
+            else:
+                raise Exception(f"請求 D-Bus 名稱 org.eyedwell.BLEServer 失敗，返回碼: {result}")
+        except Exception as e:
+            logger.error(f"D-Bus 連接或名稱請求失敗: {e}")
+            raise
 
     async def _setup_adapter(self):
-        # 檢查適配器是否存在
+        """設置藍牙適配器屬性"""
         try:
-            await self.bus.call(
+            # 基本設置
+            await self._set_property("Powered", Variant("b", True))
+            await self._set_property("Alias", Variant("s", self.device_name))
+            await self._set_property("Discoverable", Variant("b", True))
+            await self._set_property("Pairable", Variant("b", True))
+            await self._set_property("PairableTimeout", Variant("u", 0))  # 永遠可配對
+            await self._set_property("DiscoverableTimeout", Variant("u", 0))  # 永遠可發現
+            logger.info(f"適配器設置完成，設備名稱: {self.device_name}")
+        except Exception as e:
+            logger.error(f"設置適配器失敗: {e}")
+            raise
+
+    async def _set_property(self, prop_name: str, value: Variant):
+        reply = await self.bus.call(
+            Message(
+                destination=BLUEZ_SERVICE,
+                path=ADAPTER_PATH,
+                interface=DBUS_PROPERTIES_IFACE,
+                member="Set",
+                signature="ssv",
+                body=[ADAPTER_IFACE, prop_name, value],
+            )
+        )
+        if reply and reply.message_type == MessageType.ERROR:
+            logger.error(f"設置 {prop_name} 失敗: {reply.body[0]}")
+
+    async def _register_pairing_agent(self):
+        """註冊配對代理"""
+        try:
+            self.pairing_agent = PairingAgent()
+            self.bus.export(self.pairing_agent.get_path(), self.pairing_agent)
+            
+            capability = "DisplayYesNo"
+            
+            reply = await self.bus.call(
                 Message(
                     destination=BLUEZ_SERVICE,
-                    path=ADAPTER_PATH,
-                    interface=DBUS_PROPERTIES_IFACE,
-                    member="GetAll",
-                    signature="s",
-                    body=["org.bluez.Adapter1"]
+                    path="/org/bluez",
+                    interface=AGENT_MANAGER_IFACE,
+                    member="RegisterAgent",
+                    signature="os",
+                    body=[self.pairing_agent.get_path(), capability],
                 )
             )
-        except Exception as e:
-            logger.error(f"適配器不存在或無法訪問: {e}")
-            raise
-        
-        # 設置適配器屬性
-        properties = [
-            ("Alias", Variant("s", self.device_name)),
-            ("Powered", Variant("b", True)),
-            ("Discoverable", Variant("b", True)),
-            ("DiscoverableTimeout", Variant("u", 0)),
-            ("Pairable", Variant("b", True)),
-        ]
-        
-        for prop, value in properties:
-            try:
-                await self.bus.call(
-                    Message(
-                        destination=BLUEZ_SERVICE,
-                        path=ADAPTER_PATH,
-                        interface=DBUS_PROPERTIES_IFACE,
-                        member="Set",
-                        signature="ssv",
-                        body=["org.bluez.Adapter1", prop, value]
-                    )
+            
+            if reply and reply.message_type == MessageType.ERROR:
+                logger.error(f"註冊配對代理失敗: {reply.body[0]}")
+                raise Exception(f"註冊配對代理失敗: {reply.body[0]}")
+            
+            # 設置為默認代理
+            reply = await self.bus.call(
+                Message(
+                    destination=BLUEZ_SERVICE,
+                    path="/org/bluez",
+                    interface=AGENT_MANAGER_IFACE,
+                    member="RequestDefaultAgent",
+                    signature="o",
+                    body=[self.pairing_agent.get_path()],
                 )
-            except Exception as e:
-                logger.warning(f"設置屬性 {prop} 失敗: {e}")
+            )
+            
+            if reply and reply.message_type == MessageType.ERROR:
+                logger.warning(f"設置默認代理失敗: {reply.body[0]}")
+                raise Exception(f"設置默認代理失敗: {reply.body[0]}")
+            
+            logger.info(f"配對代理已註冊，使用能力: {capability}")
+            
+        except Exception as e:
+            logger.error(f"註冊配對代理錯誤: {e}")
+            raise
 
-    async def _setup_gatt_services(self):
-        """設置 GATT 服務和特徵值"""
-        # 創建 GATT 應用程序
-        self.app = GattApplication(self.bus, "/org/example")
+    async def _unregister_pairing_agent(self):
+        """取消註冊配對代理"""
+        if not self.bus or not self.pairing_agent:
+            logger.debug("無配對代理物件，跳過取消註冊")
+            return
         
-        # 創建視力測試服務
-        self.service = GattService(self.bus, 0, self.VISION_ROBOT_SERVICE_UUID)
+        try:
+            reply = await self.bus.call(
+                Message(
+                    destination=BLUEZ_SERVICE,
+                    path="/org/bluez",
+                    interface=AGENT_MANAGER_IFACE,
+                    member="UnregisterAgent",
+                    signature="o",
+                    body=[self.pairing_agent.get_path()],
+                )
+            )
+            
+            if reply and reply.message_type == MessageType.ERROR:
+                logger.debug(f"取消配對代理註冊失敗: {reply.body[0]}")
+            else:
+                logger.info("配對代理已取消註冊")
+            
+            self.bus.unexport(self.pairing_agent.get_path())
+            self.pairing_agent = None
+            
+        except Exception as e:
+            logger.error(f"取消配對代理註冊錯誤: {e}")
+
+    async def _register_advertisement(self):
+        if not self.bus:
+            logger.error("D-Bus 未連接，無法註冊廣告")
+            return
+        try:
+            self.advertisement = Advertisement(0, self.device_name)
+            self.bus.export(self.advertisement.get_path(), self.advertisement)
+            # 提供 LEAdvertisingManager1 的內省數據
+            introspection = Node.parse("""
+                <node>
+                    <interface name="org.bluez.LEAdvertisingManager1">
+                        <method name="RegisterAdvertisement">
+                            <arg type="o" name="advertisement" direction="in"/>
+                            <arg type="a{sv}" name="options" direction="in"/>
+                        </method>
+                        <method name="UnregisterAdvertisement">
+                            <arg type="o" name="advertisement" direction="in"/>
+                        </method>
+                    </interface>
+                </node>
+            """)
+            obj = self.bus.get_proxy_object(BLUEZ_SERVICE, ADAPTER_PATH, introspection)
+            ad_manager = obj.get_interface(ADVERTISING_MANAGER_IFACE)
+            reply = await ad_manager.call_register_advertisement(self.advertisement.get_path(), {})
+            if reply and reply.message_type == MessageType.ERROR:
+                logger.error(f"註冊廣告失敗: {reply.body[0]}")
+                raise Exception(f"註冊廣告失敗: {reply.body[0]}")
+            logger.info("廣告已註冊")
+        except Exception as e:
+            logger.error(f"註冊廣告錯誤: {e}")
+            raise
+
+    async def _unregister_advertisement(self):
+        if not self.bus or not self.advertisement:
+            logger.debug("無廣告物件，跳過取消註冊")
+            return
+        try:
+            introspection = Node.parse("""
+                <node>
+                    <interface name="org.bluez.LEAdvertisingManager1">
+                        <method name="UnregisterAdvertisement">
+                            <arg type="o" name="advertisement" direction="in"/>
+                        </method>
+                    </interface>
+                </node>
+            """)
+            obj = self.bus.get_proxy_object(BLUEZ_SERVICE, ADAPTER_PATH, introspection)
+            ad_manager = obj.get_interface(ADVERTISING_MANAGER_IFACE)
+            reply = await ad_manager.call_unregister_advertisement(self.advertisement.get_path())
+            if reply and reply.message_type == MessageType.ERROR:
+                logger.debug(f"取消廣告註冊失敗: {reply.body[0]}")
+            else:
+                logger.info("廣告已取消註冊")
+            self.bus.unexport(self.advertisement.get_path())
+            self.advertisement = None
+        except Exception as e:
+            logger.error(f"取消廣告註冊錯誤: {e}")
+
+    async def _create_gatt_services(self):
+        self.gatt_app = GattApplication(self.bus)
+        service = EyeDwellGattService(self.bus)
+        self.data_char = DataCharacteristic(self.bus, self)
+        service.add_characteristic(CommandCharacteristic(self.bus, self))
+        service.add_characteristic(self.data_char)
+        service.add_characteristic(ResponseCharacteristic(self.bus, self))
+        self.gatt_app.add_service(service)
         
-        # 創建控制特徵值（手機寫入命令）
-        self.control_char = GattCharacteristic(
-            self.bus, 0, self.CONTROL_CHAR_UUID, 
-            ['write', 'write-without-response'], self.service
-        )
-        self.control_char.write_callback = self._handle_control_write
-        
-        # 創建數據特徵值（機器人發送數據，手機讀取和接收通知）
-        self.data_char = GattCharacteristic(
-            self.bus, 1, self.DATA_CHAR_UUID,
-            ['read', 'notify'], self.service
-        )
-        self.data_char.read_callback = self._handle_data_read
-        
-        # 創建狀態特徵值（機器人發送狀態）
-        self.status_char = GattCharacteristic(
-            self.bus, 2, self.STATUS_CHAR_UUID,
-            ['read', 'notify'], self.service
-        )
-        self.status_char.read_callback = self._handle_status_read
-        
-        # 將特徵值添加到服務
-        self.service.add_characteristic(self.control_char)
-        self.service.add_characteristic(self.data_char)
-        self.service.add_characteristic(self.status_char)
-        
-        # 將服務添加到應用程序
-        self.app.add_service(self.service)
-        
-        # 在 D-Bus 上註冊所有服務和特徵值
-        self.bus.export("/org/example", self.app)
-        self.bus.export(self.service.get_path(), self.service)
-        self.bus.export(self.control_char.get_path(), self.control_char)
-        self.bus.export(self.data_char.get_path(), self.data_char)
-        self.bus.export(self.status_char.get_path(), self.status_char)
+        # 導出所有對象
+        self.bus.export(self.gatt_app.path, self.gatt_app)
+        self.bus.export(service.path, service)
+        for char in service.characteristics.values():
+            self.bus.export(char.path, char)
 
     async def _register_gatt_application(self):
-        """註冊 GATT 應用程序"""
-        try:
-            await self.bus.call(
-                Message(
-                    destination=BLUEZ_SERVICE,
-                    path=ADAPTER_PATH,
-                    interface=GATT_MANAGER_IFACE,
-                    member="RegisterApplication",
-                    signature="oa{sv}",
-                    body=["/org/example", {}]
-                )
+        reply = await self.bus.call(
+            Message(
+                destination=BLUEZ_SERVICE,
+                path=ADAPTER_PATH,
+                interface=GATT_MANAGER_IFACE,
+                member="RegisterApplication",
+                signature="oa{sv}",
+                body=["/org/eyedwell/app", {}],
             )
-            logger.info("GATT 應用程序註冊成功")
-        except Exception as e:
-            logger.error(f"GATT 應用程序註冊失敗: {e}")
-            raise
+        )
+        if reply and reply.message_type == MessageType.ERROR:
+            logger.error(f"註冊 GATT 應用失敗: {reply.body[0]}")
+            raise Exception(reply.body[0])
 
     async def _unregister_gatt_application(self):
-        """取消註冊 GATT 應用程序"""
-        try:
-            await self.bus.call(
+        if self.bus:
+            reply = await self.bus.call(
                 Message(
                     destination=BLUEZ_SERVICE,
                     path=ADAPTER_PATH,
                     interface=GATT_MANAGER_IFACE,
                     member="UnregisterApplication",
                     signature="o",
-                    body=["/org/example"]
+                    body=["/org/eyedwell/app"],
                 )
             )
-            logger.info("GATT 應用程序取消註冊成功")
-        except Exception as e:
-            logger.warning(f"GATT 應用程序取消註冊失敗: {e}")
+            if reply and reply.message_type == MessageType.ERROR:
+                logger.debug(f"取消註冊失敗: {reply.body[0]}")
 
-    async def _register_advertisement(self):
-        """註冊 BLE 廣播"""
-        try:
-            # 使用 hciconfig 命令啟用廣播
-            proc = await asyncio.create_subprocess_exec(
-                'sudo', 'hciconfig', 'hci0', 'up',
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
-            )
-            await proc.communicate()
-            
-            proc = await asyncio.create_subprocess_exec(
-                'sudo', 'hciconfig', 'hci0', 'piscan',
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
-            )
-            await proc.communicate()
-            
-            proc = await asyncio.create_subprocess_exec(
-                'sudo', 'hciconfig', 'hci0', 'leadv',
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
-            )
-            await proc.communicate()
-            
-            logger.info("BLE 廣播已啟用")
-        except Exception as e:
-            logger.error(f"BLE 廣播註冊失敗: {e}")
+    def _start_connection_monitor(self):
+        self.monitor_task = asyncio.create_task(self._monitor_connections())
 
-    async def _stop_advertisement(self):
-        """停止 BLE 廣播"""
-        try:
-            await self.bus.call(
-                Message(
-                    destination=BLUEZ_SERVICE,
-                    path=ADAPTER_PATH,
-                    interface=DBUS_PROPERTIES_IFACE,
-                    member="Set",
-                    signature="ssv",
-                    body=["org.bluez.Adapter1", "Discoverable", Variant("b", False)]
-                )
-            )
-            logger.info("BLE 廣播已停止")
-        except Exception as e:
-            logger.warning(f"停止 BLE 廣播失敗: {e}")
+    async def _is_phone_device(self, device_props: Dict) -> bool:
+        # 檢查設備是否為手機
+        device_class = device_props.get("Class", Variant("u", 0)).value
+        if device_class in PHONE_DEVICE_CLASSES:
+            return True
+
+        name = device_props.get("Name", Variant("s", "")).value.lower()
+        alias = device_props.get("Alias", Variant("s", "")).value.lower()
+        device_name = (name + " " + alias).strip()
+        if any(keyword in device_name for keyword in PHONE_KEYWORDS):
+            return True
+
+        uuids = device_props.get("UUIDs", Variant("as", [])).value
+        if any(uuid.lower() in PHONE_UUIDS for uuid in uuids):
+            return True
+
+        return False
 
     async def _monitor_connections(self):
-        """監控連線狀態"""
+        """監控設備連接狀態"""
         last_connected = False
+        pairing_attempts = set()  # 記錄配對嘗試
         
-        while self.bus:
+        while True:
             try:
                 reply = await self.bus.call(
                     Message(
@@ -373,122 +622,87 @@ class BLEServer:
                         path="/",
                         interface=DBUS_OBJECT_MANAGER_IFACE,
                         member="GetManagedObjects",
-                        signature="",
-                        body=[]
                     )
                 )
                 
-                connected = False
-                client_addr = ""
-                
+                is_phone_connected = False
+                connected_device_path = None
+
                 for path, interfaces in reply.body[0].items():
-                    if "org.bluez.Device1" in interfaces:
-                        device_props = interfaces["org.bluez.Device1"]
-                        if device_props.get("Connected", Variant("b", False)).value:
-                            connected = True
-                            if "/dev_" in path:
-                                client_addr = path.split("/dev_")[-1].replace("_", ":")
+                    if DEVICE_IFACE not in interfaces:
+                        continue
+                        
+                    device_props = interfaces[DEVICE_IFACE]
+                    
+                    # 檢查是否為手機設備
+                    if await self._is_phone_device(device_props):
+                        paired = device_props.get("Paired", Variant("b", False)).value
+                        trusted = device_props.get("Trusted", Variant("b", False)).value
+                        connected = device_props.get("Connected", Variant("b", False)).value
+                        
+                        # 記錄配對狀態變化
+                        device_address = device_props.get("Address", Variant("s", "unknown")).value
+                        if paired and device_address not in pairing_attempts:
+                            pairing_attempts.add(device_address)
+                            logger.info(f"手機設備 {device_address} 配對成功")
+                        
+                        # 自動信任已配對的設備
+                        if paired and not trusted:
+                            logger.info(f"設置設備 {path} 為信任")
+                            await self._set_device_property(path, "Trusted", Variant("b", True))
+                        
+                        if connected:
+                            is_phone_connected = True
+                            connected_device_path = path
+                            logger.info(f"手機設備已連接: {path}")
                             break
-                
-                if connected != last_connected:
-                    self.is_connected = connected
-                    self.client_address = client_addr
-                    logger.info(f"手機連線狀態: {connected}")
-                    
+
+                # 通知連接狀態變化
+                if is_phone_connected != last_connected:
+                    self.is_connected = is_phone_connected
+                    self.connected_device_path = connected_device_path
                     if self.on_connection_changed:
-                        try:
-                            if asyncio.iscoroutinefunction(self.on_connection_changed):
-                                await self.on_connection_changed(connected)
-                            else:
-                                self.on_connection_changed(connected)
-                        except Exception as e:
-                            logger.error(f"Error in connection callback: {e}")
-                    
-                    last_connected = connected
-                
+                        await self.on_connection_changed(is_phone_connected)
+                    last_connected = is_phone_connected
+
                 await asyncio.sleep(2)
                 
+            except asyncio.CancelledError:
+                break
             except Exception as e:
-                logger.error(f"監控連線狀態時發生錯誤: {e}")
+                logger.error(f"連線監控錯誤: {e}")
                 await asyncio.sleep(5)
 
-    def _handle_control_write(self, data: bytes):
-        """處理控制特徵值的寫入"""
+    async def _set_device_property(self, device_path: str, prop_name: str, value: Variant):
+        """設置設備屬性"""
         try:
-            command = data.decode('utf-8', errors='ignore')
-            logger.info(f"收到控制命令: {command}")
-            
-            if self.on_control_command:
-                if asyncio.iscoroutinefunction(self.on_control_command):
-                    asyncio.create_task(self.on_control_command(command))
-                else:
-                    self.on_control_command(command)
+            reply = await self.bus.call(
+                Message(
+                    destination=BLUEZ_SERVICE,
+                    path=device_path,
+                    interface=DBUS_PROPERTIES_IFACE,
+                    member="Set",
+                    signature="ssv",
+                    body=[DEVICE_IFACE, prop_name, value],
+                )
+            )
+            if reply and reply.message_type == MessageType.ERROR:
+                logger.error(f"設置設備 {device_path} 的 {prop_name} 失敗: {reply.body[0]}")
         except Exception as e:
-            logger.error(f"處理控制命令時發生錯誤: {e}")
-
-    def _handle_data_read(self):
-        """處理數據特徵值的讀取"""
-        return self.data_char.value
-
-    def _handle_status_read(self):
-        """處理狀態特徵值的讀取"""
-        return self.status_char.value
+            logger.error(f"設置設備屬性錯誤: {e}")
 
     async def send_data(self, data: bytes) -> bool:
-        """發送數據到手機"""
-        if not self.is_connected:
-            logger.warning("無法發送數據：手機未連線")
+        if not self.is_connected or not self.data_char:
             return False
+        if len(data) > 500:
+            data = data[:500]
+        self.data_char.set_value(data)
+        return True
+    
+if __name__ == "__main__":
+    async def main():
+        # 設置日誌級別以查看調試信息
+        logging.basicConfig(level=logging.DEBUG)
+        await BLEServer("EyeDwell").start_server()
         
-        try:
-            # 限制數據大小（BLE MTU 限制）
-            if len(data) > 500:
-                logger.warning(f"數據過大: {len(data)} bytes，截斷至500字節")
-                data = data[:500]
-            
-            self.data_char.set_value(list(data))
-            logger.info(f"數據已發送: {len(data)} bytes")
-            return True
-        except Exception as e:
-            logger.error(f"發送數據時發生錯誤: {e}")
-            return False
-
-    async def send_status_update(self, status: str, details: dict = None) -> bool:
-        """發送狀態更新到手機"""
-        if not self.is_connected:
-            logger.warning("無法發送狀態：手機未連線")
-            return False
-        
-        status_data = {
-            "status": status,
-            "details": details or {},
-            "timestamp": time.time(),
-            "robot_id": self.device_name
-        }
-        
-        try:
-            json_data = json.dumps(status_data, ensure_ascii=False)
-            data = json_data.encode('utf-8')
-            
-            # 限制數據大小
-            if len(data) > 500:
-                logger.warning(f"狀態數據過大: {len(data)} bytes")
-                return False
-            
-            self.status_char.set_value(list(data))
-            logger.info(f"狀態更新已發送: {status}")
-            return True
-        except Exception as e:
-            logger.error(f"發送狀態更新時發生錯誤: {e}")
-            return False
-
-    def get_robot_status(self) -> dict:
-        """獲取機器人當前狀態"""
-        return {
-            "connected": self.is_connected,
-            "device_name": self.device_name,
-            "client_address": self.client_address,
-            "test_active": self.test_active,
-            "waiting_for_response": self.waiting_for_response,
-            "timestamp": time.time()
-        }
+    asyncio.run(main())
