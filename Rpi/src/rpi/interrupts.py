@@ -60,24 +60,14 @@ def _handle_show_img(test: VisionTest, phone_mode: bool = False):
     thickness = vision.thickness[int(test.cur_degree * 10) - 1]
     test.dir = random.randint(0, 3)
     _LOGGER.debug(f"Dir: {test.dir} (phone_mode: {phone_mode})")
-    
-    if phone_mode:
-        # 手機模式：清空 OLED，圖像由手機端處理
-        test.oled.clear()
-        test.oled.display()
-        _LOGGER.info("手機模式：圖像將由手機端處理")
-    else:
-        # 按鈕模式：在 OLED 上顯示圖像
-        img = draw_circle_with_right_opening(thickness=thickness)
-        result = paste_square_image_centered(img.rotate(test.dir * 90))
-        show_img(test, result)
+    img = draw_circle_with_right_opening(thickness=thickness)
+    result = paste_square_image_centered(img.rotate(test.dir * 90))
+    show_img(test, result)
 
 def _handle_user_response(test: VisionTest, phone_mode: bool = False):
     if phone_mode:
-        # 手機模式：等待手機回應
         test.got_resp = _get_phone_test_response(test)
     else:
-        # 按鈕模式：使用語音辨識
         test.got_resp = test_resp(test)
     
     _LOGGER.info(f'Got test response: {test.got_resp} (phone_mode: {phone_mode})')
@@ -85,7 +75,6 @@ def _handle_user_response(test: VisionTest, phone_mode: bool = False):
 def _get_phone_test_response(test: VisionTest) -> bool:
     """獲取手機測試回應"""
     try:
-        # 使用手機模式的 STT API 獲取回應
         direction = test.stt.get_test_resp(test.lang)
         return direction == test.dir
     except Exception as e:

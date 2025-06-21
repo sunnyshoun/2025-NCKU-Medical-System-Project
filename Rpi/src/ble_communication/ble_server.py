@@ -328,11 +328,6 @@ class DataCharacteristic(EyeDwellCharacteristic):
         super().__init__(bus, DATA_CHAR_UUID, ["read", "notify"], "/org/eyedwell/app/service0/char1", ble_server)
 
 
-class ResponseCharacteristic(EyeDwellCharacteristic):
-    def __init__(self, bus, ble_server):
-        super().__init__(bus, "12345678-abcd-1234-5678-123456789ab3", ["write", "notify"], "/org/eyedwell/app/service0/char2", ble_server)
-
-
 class BLEServer:
     def __init__(self, device_name: str = "EyeDwell"):
         self.device_name = device_name
@@ -564,7 +559,6 @@ class BLEServer:
         self.data_char = DataCharacteristic(self.bus, self)
         service.add_characteristic(CommandCharacteristic(self.bus, self))
         service.add_characteristic(self.data_char)
-        service.add_characteristic(ResponseCharacteristic(self.bus, self))
         self.gatt_app.add_service(service)
         
         # 導出所有對象
