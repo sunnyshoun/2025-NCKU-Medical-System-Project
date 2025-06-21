@@ -209,7 +209,6 @@ class TestCoordinator:
                     loop = asyncio.get_event_loop()
                     loop.create_task(self.phone_handler.send_test_result(result))
                 except RuntimeError:
-                    # 如果沒有事件循環，創建新線程執行
                     async def async_send():
                         await self.phone_handler.send_test_result(result)
                     
