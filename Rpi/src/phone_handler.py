@@ -112,14 +112,13 @@ class PhoneHandler:
     def _text_to_direction(self, text: str) -> Optional[int]:
         """將文字轉換為方向代碼"""
         direction_map = {
-            "右": 0, "右邊": 0, "右側": 0,
-            "上": 1, "上面": 1, "上方": 1,
+            "うえ": 1, "上": 1, "した": 3, "下": 3, "左": 2, "右": 0, "みぎ": 0,
+            "up": 1, "down": 3, "left": 2, "right": 0,
+            "上": 1, "上面": 1, "下": 3, "下面": 3, "左": 2, "左邊": 2, "右": 0, "右邊": 0, "yo": 0,
             "左": 2, "左邊": 2, "左側": 2,
             "下": 3, "下面": 3, "下方": 3,
-            "right": 0,
-            "up": 1, "top": 1,
-            "left": 2,
-            "down": 3, "bottom": 3,
+            "t-ing* p-ing*": 1, "t-ing* k-uan*": 1, "e* b-in*": 3, "e* kh-a*": 3,
+            "t-o* p-ing*": 2, "t-o* tsh-iu* p-ing*": 2, "ts-iann* tsh-iu* p-ing*": 0, "ts-iann* p-ing*": 0,
             "0": 0, "1": 1, "2": 2, "3": 3,
         }
         text_lower = text.lower()
