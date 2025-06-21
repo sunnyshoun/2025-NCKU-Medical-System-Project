@@ -27,20 +27,6 @@ AGENT_IFACE = "org.bluez.Agent1"
 SERVICE_UUID = "12345678-abcd-1234-5678-123456789abc"
 COMMAND_CHAR_UUID = "12345678-abcd-1234-5678-123456789ab1"
 DATA_CHAR_UUID = "12345678-abcd-1234-5678-123456789ab2"
-RESPONSE_CHAR_UUID = "12345678-abcd-1234-5678-123456789ab3"
-
-# 手機設備辨識
-PHONE_DEVICE_CLASSES = {
-    0x05A020,  # Phone - Cellular
-    0x05A024,  # Phone - Cordless
-    0x05A028,  # Phone - Smartphone
-}
-PHONE_KEYWORDS = ["phone", "iphone", "android", "smartphone", "mobile"]
-PHONE_UUIDS = {
-    "00001101-0000-1000-8000-00805f9b34fb",  # Serial Port Profile (SPP)
-    "0000110e-0000-1000-8000-00805f9b34fb",  # Audio/Video Remote Control Profile
-    "0000111e-0000-1000-8000-00805f9b34fb",  # Hands-Free Profile
-}
 
 
 class PairingAgent(ServiceInterface):
@@ -297,10 +283,44 @@ class EyeDwellCharacteristic(ServiceInterface):
 class CommandCharacteristic(EyeDwellCharacteristic):
     def __init__(self, bus, ble_server):
         super().__init__(bus, COMMAND_CHAR_UUID, ["write"], "/org/eyedwell/app/service0/char0", ble_server)
+        self.input_buffer = bytearray()  # 初始化輸入緩衝區
 
     async def on_write(self, data: bytes):
-        if self.ble_server and self.ble_server.on_command_received:
-            await self.ble_server.on_command_received(data.decode("utf-8"))
+        if not self.ble_server:
+            logger.error("BLE 服務器未設置")
+            return
+
+        # 將接收到的數據添加到緩衝區
+        self.input_buffer.extend(data)
+        logger.debug(f"接收到數據: {data.decode('utf-8', errors='ignore')}, 當前緩衝區: {self.input_buffer.decode('utf-8', errors='ignore')}")
+
+        # 檢查緩衝區中的完整封包
+        while b'{' in self.input_buffer and b'}' in self.input_buffer:
+            start_idx = self.input_buffer.index(b'{')
+            end_idx = self.input_buffer.index(b'}', start_idx) + 1
+            packet = self.input_buffer[start_idx:end_idx]
+            
+            try:
+                # 嘗試解碼為 UTF-8 並調用回調函數
+                packet_str = packet.decode("utf-8")
+                if self.ble_server.on_command_received:
+                    await self.ble_server.on_command_received(packet_str)
+                logger.info(f"處理完整封包: {packet_str}")
+            except UnicodeDecodeError as e:
+                logger.error(f"封包解碼失敗: {e}")
+                # 清空緩衝區以避免無效數據累積
+                self.input_buffer = bytearray()
+                break
+            except Exception as e:
+                logger.error(f"處理封包時發生錯誤: {e}")
+            
+            # 移除已處理的封包
+            self.input_buffer = self.input_buffer[end_idx:]
+        
+        # 如果緩衝區過長（例如超過 1KB），清空以防止溢出
+        if len(self.input_buffer) > 1024:
+            logger.warning("輸入緩衝區過長，清空緩衝區")
+            self.input_buffer = bytearray()
 
 
 class DataCharacteristic(EyeDwellCharacteristic):
@@ -310,11 +330,7 @@ class DataCharacteristic(EyeDwellCharacteristic):
 
 class ResponseCharacteristic(EyeDwellCharacteristic):
     def __init__(self, bus, ble_server):
-        super().__init__(bus, RESPONSE_CHAR_UUID, ["write"], "/org/eyedwell/app/service0/char2", ble_server)
-
-    async def on_write(self, data: bytes):
-        if self.ble_server and self.ble_server.on_response_received:
-            await self.ble_server.on_response_received(data.decode("utf-8"))
+        super().__init__(bus, "12345678-abcd-1234-5678-123456789ab3", ["write", "notify"], "/org/eyedwell/app/service0/char2", ble_server)
 
 
 class BLEServer:
@@ -340,7 +356,6 @@ class BLEServer:
             await self._create_gatt_services()
             await self._register_advertisement()
             await self._register_gatt_application()
-            self._start_connection_monitor()
             logger.info("BLE 服務器啟動成功")
         except Exception as e:
             logger.error(f"啟動失敗: {e}")
@@ -588,91 +603,6 @@ class BLEServer:
             if reply and reply.message_type == MessageType.ERROR:
                 logger.debug(f"取消註冊失敗: {reply.body[0]}")
 
-    def _start_connection_monitor(self):
-        self.monitor_task = asyncio.create_task(self._monitor_connections())
-
-    async def _is_phone_device(self, device_props: Dict) -> bool:
-        # 檢查設備是否為手機
-        device_class = device_props.get("Class", Variant("u", 0)).value
-        if device_class in PHONE_DEVICE_CLASSES:
-            return True
-
-        name = device_props.get("Name", Variant("s", "")).value.lower()
-        alias = device_props.get("Alias", Variant("s", "")).value.lower()
-        device_name = (name + " " + alias).strip()
-        if any(keyword in device_name for keyword in PHONE_KEYWORDS):
-            return True
-
-        uuids = device_props.get("UUIDs", Variant("as", [])).value
-        if any(uuid.lower() in PHONE_UUIDS for uuid in uuids):
-            return True
-
-        return False
-
-    async def _monitor_connections(self):
-        """監控設備連接狀態"""
-        last_connected = False
-        pairing_attempts = set()  # 記錄配對嘗試
-        
-        while True:
-            try:
-                reply = await self.bus.call(
-                    Message(
-                        destination=BLUEZ_SERVICE,
-                        path="/",
-                        interface=DBUS_OBJECT_MANAGER_IFACE,
-                        member="GetManagedObjects",
-                    )
-                )
-                
-                is_phone_connected = False
-                connected_device_path = None
-
-                for path, interfaces in reply.body[0].items():
-                    if DEVICE_IFACE not in interfaces:
-                        continue
-                        
-                    device_props = interfaces[DEVICE_IFACE]
-                    
-                    # 檢查是否為手機設備
-                    if await self._is_phone_device(device_props):
-                        paired = device_props.get("Paired", Variant("b", False)).value
-                        trusted = device_props.get("Trusted", Variant("b", False)).value
-                        connected = device_props.get("Connected", Variant("b", False)).value
-                        
-                        # 記錄配對狀態變化
-                        device_address = device_props.get("Address", Variant("s", "unknown")).value
-                        if paired and device_address not in pairing_attempts:
-                            pairing_attempts.add(device_address)
-                            logger.info(f"手機設備 {device_address} 配對成功")
-                        
-                        # 自動信任已配對的設備
-                        if paired and not trusted:
-                            logger.info(f"設置設備 {path} 為信任")
-                            await self._set_device_property(path, "Trusted", Variant("b", True))
-                        
-                        if connected:
-                            is_phone_connected = True
-                            connected_device_path = path
-                            logger.info(f"手機設備已連接: {path}")
-                            break
-
-                # 通知連接狀態變化
-                if is_phone_connected != last_connected:
-                    self.is_connected = is_phone_connected
-                    self.connected_device_path = connected_device_path
-                    if self.on_connection_changed:
-                        await self.on_connection_changed(is_phone_connected)
-                    last_connected = is_phone_connected
-
-                await asyncio.sleep(2)
-                
-            except asyncio.CancelledError:
-                break
-            except Exception as e:
-                logger.error(f"連線監控錯誤: {e}")
-                await asyncio.sleep(5)
-
     async def _set_device_property(self, device_path: str, prop_name: str, value: Variant):
         """設置設備屬性"""
         try:
@@ -698,11 +628,3 @@ class BLEServer:
             data = data[:500]
         self.data_char.set_value(data)
         return True
-    
-if __name__ == "__main__":
-    async def main():
-        # 設置日誌級別以查看調試信息
-        logging.basicConfig(level=logging.DEBUG)
-        await BLEServer("EyeDwell").start_server()
-        
-    asyncio.run(main())

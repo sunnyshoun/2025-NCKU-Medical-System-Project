@@ -42,9 +42,7 @@ class PhoneHandler:
         self.logger.info(f"手機連線狀態變更: {connected}")
         
         if connected:
-            # 連線後切換到手機模式
-            await self.robot_controller.switch_to_phone_mode()
-            self.logger.info("已切換到手機控制模式")
+            self.logger.info("手機已建立 BLE 連線，等待 connect 命令")
         else:
             # 斷線後回到板載按鈕操作的主選單
             await self.robot_controller.switch_to_button_mode()
@@ -59,7 +57,22 @@ class PhoneHandler:
             cmd_data = json.loads(command)
             cmd_type = cmd_data.get("type")
             
-            if cmd_type == "start_test":
+            if cmd_type == "connect":
+                self.logger.info("收到 connect 命令")
+                # 切換到手機模式
+                await self.robot_controller.switch_to_phone_mode()
+                self.logger.info("已切換到手機控制模式")
+            
+            elif cmd_type == "disconnect":
+                self.logger.info("收到 disconnect 命令")
+                # 回到主畫面（按鈕模式）
+                await self.robot_controller.switch_to_button_mode()
+                # 停止當前測試（如果有的話）
+                if self.robot_controller.test_coordinator:
+                    await self.robot_controller.test_coordinator.stop_test()
+                self.logger.info("已切換回板載按鈕操作模式")
+            
+            elif cmd_type == "start_test":
                 self.logger.info("收到開始測試命令")
                 success = await self.robot_controller.start_phone_test()
                 if success:
