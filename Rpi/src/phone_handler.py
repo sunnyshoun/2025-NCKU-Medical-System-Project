@@ -18,8 +18,6 @@ class PhoneHandler:
         self.logger.info("啟動手機處理器...")
         self.ble_server = BLEServer("EyeDwell")
         self.ble_server.on_command_received = self._handle_command
-        self.ble_server.on_response_received = self._handle_command
-        self.ble_server.on_connection_changed = self._handle_connection_changed
         await self.ble_server.start_server()
         self.logger.info("BLE 服務器啟動成功")
 
@@ -35,21 +33,6 @@ class PhoneHandler:
     def is_connected(self) -> bool:
         """檢查手機是否已連線"""
         return self.connection_status
-
-    async def _handle_connection_changed(self, connected: bool):
-        """處理連線狀態變化"""
-        self.connection_status = connected
-        self.logger.info(f"手機連線狀態變更: {connected}")
-        
-        if connected:
-            self.logger.info("手機已建立 BLE 連線，等待 connect 命令")
-        else:
-            # 斷線後回到板載按鈕操作的主選單
-            await self.robot_controller.switch_to_button_mode()
-            # 停止當前測試（如果有的話）
-            if self.robot_controller.test_coordinator:
-                await self.robot_controller.test_coordinator.stop_test()
-            self.logger.info("已切換回板載按鈕操作模式")
 
     async def _handle_command(self, command: str):
         """處理來自手機的命令"""
@@ -124,36 +107,18 @@ class PhoneHandler:
         text_lower = text.lower()
         return direction_map.get(text_lower)
 
-    async def notify_ready_for_input(self) -> bool:
-        """通知手機準備接收輸入"""
-        if not self.is_connected():
-            self.logger.warning("手機未連線，無法發送通知")
-            return False
-        message = {"type": "ready_for_input", "data": {}}
-        success = await self._send_message(message)
-        if success:
-            self.logger.info("已通知手機準備接收輸入")
-        return success
+    async def notify_ready_for_input(self):
+        message = {"type": "ready_for_input"}
+        await self._send_message(message)
 
-    async def notify_ready_for_direction(self) -> bool:
-        """通知手機準備選擇方向（與 notify_ready_for_input 同義）"""
-        return await self.notify_ready_for_input()
-
-    async def send_test_result(self, vision_score: float) -> bool:
+    async def send_test_result(self, vision_score: float):
         """發送測試結果"""
-        if not self.is_connected():
-            self.logger.warning("手機未連線，無法發送測試結果")
-            return False
         message = {
             "type": "test_complete",
             "data": {"vision_score": vision_score}
         }
-        success = await self._send_message(message)
-        if success:
-            self.logger.info(f"已發送測試結果: {vision_score}")
-            await asyncio.sleep(0.1)
-            await self.robot_controller.show_phone_connected_status()
-        return success
+        await self._send_message(message)
+        await self.robot_controller.show_phone_connected_status()
 
     async def _send_message(self, message: Dict) -> bool:
         """發送訊息到手機"""

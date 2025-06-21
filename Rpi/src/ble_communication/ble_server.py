@@ -338,8 +338,6 @@ class BLEServer:
         self.is_connected = False
         self.connected_device_path = None
         self.on_command_received: Optional[Callable[[str], Any]] = None
-        self.on_response_received: Optional[Callable[[str], Any]] = None
-        self.on_connection_changed: Optional[Callable[[bool], Any]] = None
         self.monitor_task = None
         self.gatt_app = None
 
