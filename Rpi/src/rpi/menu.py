@@ -281,10 +281,3 @@ class MainMenu(MenuBase):
     async def _goto_root(self):
         _LOGGER.info('Change to root')
         await self.stop_bluetooth_update()
-
-    async def __del__(self):
-        try:
-            await self.stop_bluetooth_update()
-            _LOGGER.info("MainMenu destroyed")
-        except Exception as e:
-            _LOGGER.error(f"Error during MainMenu cleanup: {e}")
