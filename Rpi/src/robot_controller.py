@@ -55,7 +55,7 @@ class RobotController:
             await self.phone_handler.stop()
         
         if self.test_coordinator:
-            await self.test_coordinator.stop_test()
+            self.test_coordinator.stop_test()
         
         self.logger.info("機器人控制器已停止")
     
@@ -118,6 +118,11 @@ class RobotController:
         async with self.mode_lock:
             if self.current_mode != "phone":
                 self.logger.info("切換到手機模式")
+                
+                if self.test_coordinator and self.test_coordinator.is_test_active():
+                    self.logger.info("檢測到正在進行的測試，立刻停止")
+                    self.test_coordinator.stop_test()
+                
                 self.current_mode = "phone"
                 
                 if self.menu:
@@ -140,7 +145,7 @@ class RobotController:
                     self.logger.debug("選單狀態已重置")
                 
                 if self.test_coordinator:
-                    await self.test_coordinator.stop_test()
+                    self.test_coordinator.stop_test()
     
     def is_phone_mode(self) -> bool:
         return self.current_mode == "phone"
@@ -160,7 +165,7 @@ class RobotController:
         
         return MENU_STATE_ROOT
     
-    async def start_phone_test(self) -> bool:
+    def start_phone_test(self) -> bool:
         if self.is_button_mode():
             self.logger.warning("按鈕模式下不能開始手機測試")
             return False
@@ -169,7 +174,7 @@ class RobotController:
             self.logger.error("測試協調器未初始化")
             return False
         
-        return await self.test_coordinator.start_phone_test()
+        return self.test_coordinator.start_phone_test()
     
     def get_system_status(self) -> dict:
         return {

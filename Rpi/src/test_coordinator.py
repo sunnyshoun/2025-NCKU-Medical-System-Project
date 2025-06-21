@@ -79,7 +79,7 @@ class TestCoordinator:
         self.logger.info("開始按鈕模式測試")
         return True
     
-    async def start_phone_test(self) -> bool:
+    def start_phone_test(self) -> bool:
         """開始手機模式測試"""
         with self.test_lock:
             if self.test_active:
@@ -113,7 +113,7 @@ class TestCoordinator:
         self.logger.info("開始手機模式測試（使用預設語言）")
         return True
     
-    async def stop_test(self):
+    def stop_test(self):
         """停止當前測試"""
         with self.test_lock:
             if not self.test_active:
