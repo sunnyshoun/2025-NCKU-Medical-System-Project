@@ -261,20 +261,20 @@ class PhoneSttAPI:
     
     def get_test_resp(self, lang) -> int:
         """等待手機的方向回應"""
-        try:
-            # 等待手機回應
-            response = self.test_coordinator.wait_for_phone_response(timeout=30.0)
-            
-            if response is not None:
-                self.logger.info(f"收到手機方向回應: {response}")
-                return response
-            else:
-                self.logger.warning("手機回應超時")
-                raise ValueError("手機回應超時")
+        while True:
+            try:
+                # 等待手機回應
+                response = self.test_coordinator.wait_for_phone_response(timeout=30.0)
                 
-        except Exception as e:
-            self.logger.error(f"獲取手機回應失敗: {e}")
-            raise ValueError(f"獲取回應失敗: {e}")
+                if response is not None:
+                    self.logger.info(f"收到手機方向回應: {response}")
+                    return response
+                else:
+                    self.logger.warning("手機回應超時重送")
+                    
+            except Exception as e:
+                self.logger.error(f"獲取手機回應失敗: {e}")
+                raise ValueError(f"獲取回應失敗: {e}")
     
     def get_lang_resp(self):
         """語言選擇（手機模式下已由手機指定）"""
