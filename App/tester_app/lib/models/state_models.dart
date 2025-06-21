@@ -77,3 +77,9 @@ class BlueListStateModel {
   BluetoothAdapterState adapterState = BluetoothAdapterState.unknown; // 藍牙狀態
   StreamSubscription<BluetoothAdapterState>? adapterStateSubscription;
 }
+
+class TestMenuModel {
+  bool isCorrectionEnabled = false;
+  String? leftCorrection;
+  String? rightCorrection;
+}
