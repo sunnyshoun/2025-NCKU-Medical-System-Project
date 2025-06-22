@@ -249,7 +249,15 @@ class EyeDwellCharacteristic(ServiceInterface):
     def set_value(self, value: bytes):
         self.value = bytearray(value)
         if "notify" in self.flags and self.notifying:
-            self.PropertiesChanged(GATT_CHARACTERISTIC_IFACE, {"Value": Variant("ay", self.value), "Notifying": Variant("b", self.notifying)}, [])
+            signal_msg = Message(
+                message_type=MessageType.SIGNAL,
+                path=self.path,
+                interface=DBUS_PROPERTIES_IFACE,
+                member="PropertiesChanged",
+                signature="sa{sv}as",
+                body=[GATT_CHARACTERISTIC_IFACE, {"Value": Variant("ay", bytes(self.value))}, []]
+            )
+            self.bus.send(signal_msg)
 
     @signal()
     def PropertiesChanged(self, interface: "s", changed: "a{sv}", invalidated: "as"):
