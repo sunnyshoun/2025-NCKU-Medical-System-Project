@@ -1,5 +1,5 @@
-import asyncio
 import logging
+import subprocess
 from typing import Optional, Callable, Dict, Any
 from dbus_fast import BusType, Variant, Message, MessageType, PropertyAccess, RequestNameReply
 from dbus_fast.aio import MessageBus
@@ -348,6 +348,7 @@ class BLEServer:
             await self._create_gatt_services()
             await self._register_advertisement()
             await self._register_gatt_application()
+            subprocess.call(["sudo", "hciconfig", "hci0", "class", "0x000100"])
             logger.info("BLE 服務器啟動成功")
         except Exception as e:
             logger.error(f"啟動失敗: {e}")

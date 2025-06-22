@@ -1,77 +1,91 @@
-# Raspberry Pi 組件
+# Raspberry Pi 視力檢測機器人組件
 
 ## 概述
-本組件運行於 Raspberry Pi，負責控制視力檢測機器人，支援語音交互（錄製與播放）、藍牙連線、OLED 顯示和按鈕輸入，支援選單連線藍芽耳機，利用藍芽耳機做視力檢測，也可連線手機App，將視力測試結果通過藍牙傳送至 Flutter App，再由手機 透過網路傳送至 Spring 後端，儲存於 PostgreSQL 資料庫。
+本組件運行於 Raspberry Pi，負責控制視力檢測機器人，支援雙操作模式：
+- **板載按鈕模式**：透過實體按鈕進行選單操作和測試
+- **手機控制模式**：透過 BLE 連接手機 App 進行遠端控制
+
+主要功能包括語音交互（錄製與播放）、藍牙耳機連線、OLED 顯示、按鈕輸入和自動馬達控制。測試結果可透過藍牙傳送至 Flutter App，再由手機透過網路傳送至後端系統。
 
 ## 硬體需求
-- Raspberry Pi 3B+ 或 以上
-- OLED 顯示器（顯示視力測試圖像）
-- 按鈕（選單操作）
-- 超音波感測器
-- 馬達
+- Raspberry Pi 3B+ 或以上
+- OLED 顯示器（128x64，I2C 地址 0x3c）
+- 3個按鈕（上/確認/下：GPIO 16/20/21）
+- 超音波感測器（Trigger: GPIO 23, Echo: GPIO 24）
+- 馬達控制模組（UART 通訊）
 
 ## 軟體依賴
 - Python 3.11+
-- 必要庫（見 `requirements.txt`）：
+- 主要套件（詳見 `requirements.txt`）：
   - `RPi.GPIO`：硬體控制
-  - `speech_recognition`、`pyaudio`：語音處理
-  - `pybluez`：藍牙連線
+  - `PyAudio`、`webrtcvad`：語音處理
+  - `dbus-fast`：藍牙 BLE 通訊
+  - `Adafruit-SSD1306`：OLED 控制
+  - `pulsectl`：音訊系統管理
 
 ## 檔案結構
 ```
+
+## 系統架構
+
+```mermaid
+flowchart TD
+    A[機器人控制器] --> B[按鈕模式]
+    A --> C[手機模式]
+    B --> D[主選單]
+    B --> E[測試協調器]
+    C --> F[BLE 處理器]
+    C --> E
+    E --> G[視力測試]
+    E --> H[硬體控制]
+    F --> I[手機 App]
+```
 Rpi/
-├── src/                          # 程式碼
-│   ├── audio/                    # 音訊模組
-│   │   ├── models.py             # 音訊相關類
-│   │   ├── detection.py          # 語言檢測
-│   │   ├── player.py             # 音訊播放
-│   │   ├── recorder.py           # 音訊錄製
-│   ├── bluetooth/                 # 藍牙模組
-│   │   ├── models.py             # 藍牙相關類
-│   │   ├── manager.py            # 藍牙設備管理
-│   ├── data/                     # 靜態資料
-│   │   ├── draw.py               # 圖像繪製
-│   │   ├── vision.py             # 視力測試邏輯
-│   │   ├── NotoSansCJK-Regular.ttc # 字型檔案
-│   ├── hardwares/                # 硬體控制
-│   │   ├── motor.py              # 馬達控制（與 Arduino 交互）
-│   │   ├── oled.py               # OLED 顯示
-│   │   ├── sonic.py              # 超音波感測器
-│   │   ├── button.py             # 按鈕輸入
-│   ├── rpi/                      # 樹莓派邏輯
-│   │   ├── models/               # 模型定義
-│   │   │   ├── menus.py          # 選單模型
-│   │   │   ├── testers.py        # 測試模型
-│   │   ├── interrupt.py          # 中斷處理
-│   │   ├── menu.py               # 選單邏輯
-│   │   ├── resource.py           # 資源管理
-│   │   ├── tester.py             # 測試邏輯
-│   ├── config/                    # 配置模組
-│   │   ├── manager.py            # 配置管理
-│   ├── main.py                   # 程式入口
-├── tests/                        # 測試
-│   ├── unit/                     # 單元測試
-│   ├── integration/              # 整合測試
-├── config.json                   # 配置檔案
-├── requirements.txt              # 依賴清單
-├── settings.py                   # 系統設置
-├── README.md                     # 本文件
+├── src/
+│   ├── audio/                    # 音訊處理（錄製、播放、語音識別）
+│   ├── ble_communication/        # BLE 服務器
+│   ├── bluetooth_headset/        # 藍牙耳機管理
+│   ├── data/                     # 視力測試參數和圖形繪製
+│   ├── hardwares/               # 硬體控制（按鈕、馬達、OLED、感測器）
+│   ├── rpi/                     # 核心邏輯（選單、測試流程、資源管理）
+│   ├── main.py                  # 程式入口
+│   ├── robot_controller.py      # 主控制器
+│   ├── phone_handler.py         # 手機通訊處理
+│   └── test_coordinator.py      # 測試協調器
+├── config.json                  # 配置檔案
+├── requirements.txt             # 依賴清單
+├── settings.py                  # 系統設置
+└── startup.sh                   # 啟動腳本
 ```
 
 ## 設置與運行
-1. **安裝依賴**：
-   ```bash
-   pip install -r requirements.txt
-   ```
 
-2. **配置硬體**：
-   - 連接到 GPIO 腳位的設備（麥克風、揚聲器、OLED、按鈕等）需符合 `config.json` 的設置。
-   - 配置藍牙連線（參見 `src/bluetooth/manager.py`）。
+### 1. 安裝依賴
+```bash
+pip install -r requirements.txt
+```
 
-3. **運行程式**：
-   ```bash
-   python src/main.py
-   ```
+### 2. 配置硬體
+- 連接到 GPIO 腳位的設備（麥克風、揚聲器、OLED、按鈕等）需符合 `settings.py` 的設置
+- 啟用 I2C 和 UART：`sudo raspi-config`
+- 配置藍牙連線（參見 `src/bluetooth_headset/device_manager.py`）
+
+### 3. 運行程式
+```bash
+# 推薦使用啟動腳本
+./startup.sh
+```
+
+## 操作模式
+
+### 板載按鈕模式
+- **主選單**：開始測試 / 藍牙設定 / 音量調整
+- **測試流程**：語言選擇 → 自動測試 → OLED 顯示結果
+
+### 手機控制模式  
+- **BLE 服務**：EyeDwell (`12345678-abcd-1234-5678-123456789abc`)
+- **手機指令**：connect/disconnect、start_test、direction_response
+- **測試流程**：自動測試（無音檔播放）→ 結果傳送至手機
 
 ## 功能表（Menu）
 |            | MENU_STATE_ROOT | MENU_STATE_BT | MENU_STATE_VOLUME |
@@ -80,67 +94,89 @@ Rpi/
 | has device | root, kp ind    | bt, kp ind    | volume, kp ind    |
 
 ## 流程圖
-### 主流程
+
+### 主控制器流程
 ```mermaid
 flowchart TD
-    set0((啟動程式))
-    set1{是否連到裝置？}
-    set2{{cs == bt ? kp : ns = root, ind = 1}}
-    set3{{kp ns}}
-    set6[cs = ns, 重整列表, 初始化目錄]
-    act0[/等待按鍵輸入/]
-    act1["ns = list[index].call_back()"]
-    act4{{index++/index--}}
-    end0[下一輪]
-    set0 --> set1
-    set1 -- 是 --> set3
-    set1 -- 否 --> set2
-    set3 --> set6
-    set2 --> set6
-    set6 --> act0
-    act0 -- 確認 --> act1
-    act0 -- 上/下 --> act4
-    act1 --> end0
-    act4 --> end0
-    end0 --> set1
+    A[啟動 RobotController] --> B[初始化組件]
+    B --> C[啟動 BLE 服務器]
+    C --> D[進入主迴圈]
+    D --> E{當前模式?}
+    E -->|按鈕模式| F[執行選單邏輯]
+    E -->|手機模式| G[顯示手機圖案]
+    F --> H[處理按鈕輸入]
+    H --> I{選單操作}
+    I -->|開始測試| J[啟動按鈕測試]
+    I -->|藍牙設定| K[藍牙耳機管理]
+    I -->|音量調整| L[音量設定]
+    G --> M[等待手機指令]
+    M --> N{收到指令?}
+    N -->|start_test| O[啟動手機測試]
+    N -->|disconnect| P[切換回按鈕模式]
+    J --> D
+    K --> D
+    L --> D
+    O --> D
+    P --> D
 ```
 
-### 視力測試流程
+### 測試協調器流程
 ```mermaid
 flowchart TD
-    set0((開始測試))
-    set1{{cur_degree=0.5, max_degree=-1, lang=input}}
-    set2[/使用者選擇語言/]
-    act0{0.1 <= cur_degree <= 1.5 ?}
-    end1{max_degree < 0 ?}
-    act1[/顯示對應度數圖像，等待輸入/]
-    act2{使用者是否看得清楚？}
-    act3{{max_degree=cur_degree, cur_degree++}}
-    act4{max_degree < 0 ?}
-    act5{{cur_degree--}}
-    end2([結束測試，度數大於最高值])
-    end3([結束測試，度數小於最低值])
-    end4([結束測試，return max_degree])
-    iter[下一輪測量]
-    act3 --> iter
-    set0 --> set2
-    set2 --> set1
-    set1 --> act0
-    act0 -- 否 --> end1
-    end1 -- 否 --> end2
-    end1 -- 是 --> end3
-    act0 -- 是 --> act1
-    act1 --> act2
-    act2 -- 否 --> act4
-    act2 -- 是 --> act3
-    act4 -- 否 --> end4
-    act4 -- 是 --> act5
-    act5 --> iter
-    iter --> act0
+    A[TestCoordinator.start_test] --> B{測試模式?}
+    B -->|按鈕模式| C[創建 VisionTest + Audio + STT]
+    B -->|手機模式| D[創建 VisionTest + DummyAudio + PhoneSTT]
+    C --> E[語言選擇流程]
+    D --> F[設定預設語言]
+    E --> G[開始測試執行緒]
+    F --> G
+    G --> H[測試主迴圈]
+    H --> I[距離測量與移動]
+    I --> J[顯示測試圖像]
+    J --> K{測試模式?}
+    K -->|按鈕模式| L[語音識別回應]
+    K -->|手機模式| M[等待手機回應]
+    L --> N[處理測試結果]
+    M --> N
+    N --> O{測試完成?}
+    O -->|否| P[調整度數]
+    O -->|是| Q{測試模式?}
+    P --> H
+    Q -->|按鈕模式| R[OLED 顯示結果]
+    Q -->|手機模式| S[BLE 傳送結果]
+    R --> T[測試結束]
+    S --> U[返回手機圖案]
+    U --> T
+```
+
+## 視力測試流程
+
+1. **初始化**：測量距離、語言設定（按鈕模式）
+2. **動態定位**：根據度數自動移動到目標距離
+3. **顯示測試**：顯示 Landolt C 視標，等待方向回應
+4. **結果處理**：按鈕模式顯示於 OLED，手機模式透過 BLE 傳送
+
+測試度數範圍：0.1 - 1.5，起始度數：0.5
+
+## BLE 通訊協議
+
+### 指令格式 (手機 → 機器人)
+```json
+{"type": "connect"}                              // 進入手機模式
+{"type": "start_test"}                          // 開始測試
+{"type": "direction_response", "direction": 2}  // 方向回應 (0=右,1=上,2=左,3=下)
+{"type": "stt_response", "text": "texts"}       // STT結果回應
+{"type": "disconnect"}                          // 回到按鈕模式
+```
+
+### 資料格式 (機器人 → 手機)
+```json
+{"type": "ready_for_input"}                     // 準備接收輸入
+{"type": "test_complete", "score": 1.2}        // 測試完成
 ```
 
 ## 注意事項
-- 確保 GPIO 腳位與 `config.json` 配置一致。
-- 語音檔案（`src/audio/audioFiles/`）需支援多語言（en、jp、tw、zh）。
-- 藍牙連線需穩定，避免中斷影響測試過程或手機連線。
-- 視力測試需確保 OLED 顯示器正常運作，測試結果通過藍牙或網路傳至 Spring 後端。
+- 確保 GPIO 腳位配置正確
+- 語音檔案需放置於 `src/audio/audioFiles/` 對應語言資料夾
+- 藍牙連線需穩定，避免測試中斷
+- 手機模式下 OLED 僅顯示手機圖案，不播放音檔
