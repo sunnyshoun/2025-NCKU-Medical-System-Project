@@ -10,10 +10,12 @@ import 'package:tester_app/models/state_models.dart';
 class BluetoothPage extends StatefulWidget {
   final GeneralStateModel generalStates;
   final BlueListStateModel blueStates;
+  final void Function() onConnected;
   const BluetoothPage({
     super.key,
     required this.generalStates,
     required this.blueStates,
+    required this.onConnected,
   });
 
   @override
@@ -41,6 +43,7 @@ class _BluetoothPageState extends State<BluetoothPage> {
         });
       }
     });
+    _controller.onConnected.add(widget.onConnected);
 
     _checkPermissions();
     _initBluetooth();
@@ -57,7 +60,7 @@ class _BluetoothPageState extends State<BluetoothPage> {
 
     if (results.values.any((status) => status.isDenied)) {
       if (mounted) {
-      _controller.showErr("請授予所有必要的權限", context);
+        _controller.showErr("請授予所有必要的權限", context);
       }
     }
   }
@@ -109,8 +112,10 @@ class _BluetoothPageState extends State<BluetoothPage> {
       );
     }
 
-    final sortedResults = List<ScanResult>.from(blueStates.scanResults)
-    ..sort((a, b) {
+    final sortedResults = List<ScanResult>.from(blueStates.scanResults)..sort((
+      a,
+      b,
+    ) {
       final aHasName = a.device.platformName.isNotEmpty;
       final bHasName = b.device.platformName.isNotEmpty;
 
@@ -122,7 +127,9 @@ class _BluetoothPageState extends State<BluetoothPage> {
       if (aHasName && bHasName) {
         return a.device.platformName.compareTo(b.device.platformName);
       }
-      return a.device.remoteId.toString().compareTo(b.device.remoteId.toString());
+      return a.device.remoteId.toString().compareTo(
+        b.device.remoteId.toString(),
+      );
     });
 
     return Scaffold(

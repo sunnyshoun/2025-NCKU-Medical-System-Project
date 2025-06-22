@@ -2,23 +2,77 @@ import 'dart:developer';
 
 import 'package:flutter/material.dart';
 import 'package:tester_app/configs/app_localizations.dart';
+import 'package:tester_app/controllers/settings_controller.dart';
+import 'package:tester_app/models/networks_models.dart';
 import 'package:tester_app/models/state_models.dart';
+import 'package:tester_app/models/user_models.dart';
+import 'package:tester_app/models/wrappers.dart';
+import 'package:tester_app/networks/blue.dart';
+import 'package:tester_app/networks/spring.dart';
 
 class ControlPage extends StatefulWidget {
   final GeneralStateModel states;
-  const ControlPage({super.key, required this.states});
+  final TestMenuModel menuStates;
+  final void Function() disconnect;
+  const ControlPage({
+    super.key,
+    required this.states,
+    required this.disconnect,
+    required this.menuStates,
+  });
 
   @override
   State<ControlPage> createState() => _ControlPageState();
 }
 
 class _ControlPageState extends State<ControlPage> {
-  String _message = '尚未操作';
+  String _message = '';
+  List<String> messageKey = ['測左眼裸視', '測右眼裸視', '測左眼矯正', '測右眼矯正'];
+  bool enable = false;
 
-  void _updateMessage(String msg) {
-    setState(() {
-      _message = msg;
-    });
+  String? l;
+  String? r;
+  String? cl;
+  String? cr;
+  int ind = 0;
+
+  void _postRecord() async {
+    if (l == null || r == null) {
+      return;
+    }
+
+    final record = VisionRecord(
+      uncorrectedVisionLeft: l!,
+      uncorrectedVisionRight: r!,
+      correctedVisionLeft: cl,
+      correctedVisionRight: cr,
+      createdAt: DateTime.now().toUtc(),
+    );
+    log(record.toJson().toString());
+
+    ApiResponse response = ApiResponse.err();
+    Future<bool> innerPost() async {
+      response = await SpringAPI.postrecords(widget.states.accessToken, record);
+      return response.statusCode == 401;
+    }
+
+    if (!await Wrappers.tryRefresh(innerPost, widget.states)) {
+      // logout
+      log('refresh token invalid');
+      UpdateProfileController.clearProfile(widget.states, context);
+      return;
+    }
+
+    if (response.statusCode != 201) {
+      showDialog(
+        context: context,
+        builder:
+            (_) => response.alertResponse(
+              context,
+              AppLocalizations(widget.states.locale),
+            ),
+      );
+    }
   }
 
   @override
@@ -27,6 +81,52 @@ class _ControlPageState extends State<ControlPage> {
     final states = widget.states;
     final t = AppLocalizations(states.locale);
     final fontSize = states.fontSize;
+    BLEInterface.onData = [
+      (value) {
+        log(value.toString());
+        if (value['type'] == 'ready_for_input') {
+          enable = true;
+        } else if (value['type'] == 'test_complete') {
+          enable = false;
+          log(value['score']);
+          switch (ind) {
+            case 0:
+              l = value['score'];
+              break;
+            case 1:
+              r = value['score'];
+              break;
+            case 2:
+              cl = value['score'];
+              break;
+            case 3:
+              cr = value['score'];
+              break;
+          }
+          BLEInterface.sendCommand(states.blue!, {'type': 'start_test'});
+          setState(() {});
+        }
+      },
+    ];
+    if (l == null) {
+      ind = 0;
+    } else if (r == null) {
+      ind = 1;
+    } else if (cl == null && widget.menuStates.isCorrectionEnabled) {
+      ind = 2;
+    } else if (cr == null && widget.menuStates.isCorrectionEnabled) {
+      ind = 3;
+    } else {
+      _postRecord();
+      l = null;
+      r = null;
+      cl = null;
+      cr = null;
+      ind = 0;
+    }
+    _message = messageKey[ind];
+
+    log('l: $l, r: $r, cl: $cl, cr: $cr');
 
     return Scaffold(
       appBar: AppBar(
@@ -53,7 +153,17 @@ class _ControlPageState extends State<ControlPage> {
                   // ↑
                   _DirectionButton(
                     icon: Icons.arrow_drop_up,
-                    onTap: () => _updateMessage('上'),
+                    onTap: () {
+                      if (enable) {
+                        BLEInterface.sendCommand(states.blue!, {
+                          'type': 'direction_response',
+                          'direction': 1,
+                        });
+                        enable = false;
+                      } else {
+                        log('ignore direction_response 1');
+                      }
+                    },
                   ),
                   Row(
                     mainAxisSize: MainAxisSize.min,
@@ -61,13 +171,23 @@ class _ControlPageState extends State<ControlPage> {
                       // ←
                       _DirectionButton(
                         icon: Icons.arrow_left,
-                        onTap: () => _updateMessage('左'),
+                        onTap: () {
+                          if (enable) {
+                            BLEInterface.sendCommand(states.blue!, {
+                              'type': 'direction_response',
+                              'direction': 2,
+                            });
+                            enable = false;
+                          } else {
+                            log('ignore direction_response 2');
+                          }
+                        },
                       ),
-                      // OK (確認)
+                      // record
                       Padding(
                         padding: const EdgeInsets.all(4.0),
                         child: ElevatedButton(
-                          onPressed: () => _updateMessage('確認'),
+                          onPressed: () => log('record'),
                           style: ElevatedButton.styleFrom(
                             shape: const CircleBorder(),
                             padding: const EdgeInsets.all(20),
@@ -79,22 +199,39 @@ class _ControlPageState extends State<ControlPage> {
                       // →
                       _DirectionButton(
                         icon: Icons.arrow_right,
-                        onTap: () => _updateMessage('右'),
+                        onTap: () {
+                          if (enable) {
+                            BLEInterface.sendCommand(states.blue!, {
+                              'type': 'direction_response',
+                              'direction': 0,
+                            });
+                            enable = false;
+                          } else {
+                            log('ignore direction_response 0');
+                          }
+                        },
                       ),
                     ],
                   ),
                   // ↓
                   _DirectionButton(
                     icon: Icons.arrow_drop_down,
-                    onTap: () => _updateMessage('下'),
+                    onTap: () {
+                      if (enable) {
+                        BLEInterface.sendCommand(states.blue!, {
+                          'type': 'direction_response',
+                          'direction': 3,
+                        });
+                        enable = false;
+                      } else {
+                        log('ignore direction_response 3');
+                      }
+                    },
                   ),
                   Spacer(),
                   ElevatedButton.icon(
                     icon: Icon(Icons.bluetooth),
-                    onPressed:
-                        () => setState(() {
-                          states.blue = null;
-                        }),
+                    onPressed: widget.disconnect,
                     label: Text(t.get('disconnect')),
                   ),
                 ],

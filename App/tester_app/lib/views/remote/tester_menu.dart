@@ -7,11 +7,13 @@ import 'package:tester_app/models/state_models.dart';
 class TesterMenuPage extends StatefulWidget {
   final GeneralStateModel generalStates;
   final TestMenuModel menuStates;
+  final void Function() start;
 
   const TesterMenuPage({
     super.key,
     required this.generalStates,
     required this.menuStates,
+    required this.start,
   });
 
   @override
@@ -35,7 +37,7 @@ class _TesterMenuPageState extends State<TesterMenuPage> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          SizedBox(height: fontSize*12),
+          SizedBox(height: fontSize * 12),
           ElevatedButton.icon(
             icon: Icon(Icons.play_arrow),
             label: Text(
@@ -43,8 +45,8 @@ class _TesterMenuPageState extends State<TesterMenuPage> {
               style: TextStyle(fontSize: fontSize),
             ),
             onPressed: () {
-              // 開始測量邏輯
               log("start_measure");
+              widget.start();
             },
           ),
           const SizedBox(height: 20),
@@ -52,7 +54,7 @@ class _TesterMenuPageState extends State<TesterMenuPage> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Text(t.get('measure_corr'), style: TextStyle(fontSize: fontSize)),
-              SizedBox(width: fontSize,),
+              SizedBox(width: fontSize),
               Switch(
                 value: menuStates.isCorrectionEnabled,
                 onChanged: (val) {
@@ -65,7 +67,7 @@ class _TesterMenuPageState extends State<TesterMenuPage> {
           ),
           const SizedBox(height: 10),
           SizedBox(
-            height: fontSize*10,
+            height: fontSize * 10,
             child: AnimatedSwitcher(
               duration: Duration(milliseconds: 100),
               child:
