@@ -90,6 +90,21 @@ class SpringAPI {
     return ApiResponse.fromHttp(response);
   }
 
+  static Future<ApiResponse> postrecords(String accessToken, VisionRecord record) async {
+    log('api:postrecords, token: $accessToken');
+
+    final response = await client.post(
+      Uri.http(BASE_DOMAIN, '/api/user/records'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $accessToken',
+      },
+      body: jsonEncode(record.toJson()),
+    );
+
+    return ApiResponse.fromHttp(response);
+  }
+
   static Future<ApiResponse> getProfile(String accessToken) async {
     log('api:getProfile, token: $accessToken');
 

@@ -5,6 +5,7 @@ import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:tester_app/configs/app_localizations.dart';
 import 'package:tester_app/models/networks_models.dart';
 import 'package:tester_app/models/state_models.dart';
+import 'package:tester_app/networks/blue.dart';
 
 class BluetoothController {
   final GeneralStateModel generalStates;
@@ -66,6 +67,8 @@ class BluetoothController {
         services: services,
         bluetoothDevice: device,
       );
+      BLEInterface.sendCommand(generalStates.blue!, {'type': 'connect'});
+      BLEInterface.subscribeToData(generalStates.blue!);
       for (var fn in onConnected) {
         fn();
       }
