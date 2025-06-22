@@ -33,8 +33,6 @@ class RobotController:
         self.is_running = False
         
     async def start(self):
-        self.logger.info("啟動機器人控制器...")
-        
         self.is_running = True
         
         await self._initialize_components()
@@ -42,12 +40,8 @@ class RobotController:
         await self.phone_handler.start()
         
         asyncio.create_task(self._menu_loop())
-        
-        self.logger.info("機器人控制器啟動完成")
     
     async def stop(self):
-        self.logger.info("停止機器人控制器...")
-        
         self.is_running = False
         
         if self.phone_handler:
@@ -55,8 +49,6 @@ class RobotController:
         
         if self.test_coordinator:
             self.test_coordinator.stop_test()
-        
-        self.logger.info("機器人控制器已停止")
     
     async def _initialize_components(self):
         self.phone_handler = PhoneHandler(self)
@@ -85,9 +77,8 @@ class RobotController:
                 async with self.mode_lock:
                     current_mode = self.current_mode
                 
-                # 如果測試正在進行，跳過選單更新
                 if self.test_coordinator and self.test_coordinator.is_test_active():
-                    await asyncio.sleep(0.5)  # 短暫等待
+                    await asyncio.sleep(0.5)
                     continue
                     
                 if current_mode == "button":
@@ -97,7 +88,7 @@ class RobotController:
                     await self._show_phone_connected()
                         
             except Exception as e:
-                self.logger.error(f"選單循環錯誤: {e}")
+                self.logger.error(f"Menu loop error: {e}")
                 await asyncio.sleep(1)
     
     async def _show_phone_connected(self):
@@ -111,15 +102,12 @@ class RobotController:
             self.oled.set_img(img)
             self.oled.display()
         except Exception as e:
-            self.logger.error(f"顯示手機圖案失敗: {e}")
+            self.logger.error(f"Show phone icon failed: {e}")
     
     async def switch_to_phone_mode(self):
         async with self.mode_lock:
             if self.current_mode != "phone":
-                self.logger.info("切換到手機模式")
-                
                 if self.test_coordinator and self.test_coordinator.is_test_active():
-                    self.logger.info("檢測到正在進行的測試，立刻停止")
                     self.test_coordinator.stop_test()
                 
                 self.current_mode = "phone"
@@ -128,20 +116,17 @@ class RobotController:
                     self.menu.state = MENU_STATE_ROOT
                     self.menu.ns = MENU_STATE_ROOT
                     await self.menu.stop_bluetooth_update()
-                    self.logger.debug("選單狀態已重置")
                 
                 await self.show_phone_connected_status()
     
     async def switch_to_button_mode(self):
         async with self.mode_lock:
             if self.current_mode != "button":
-                self.logger.info("切換到按鈕模式")
                 self.current_mode = "button"
                 
                 if self.menu:
                     self.menu.state = MENU_STATE_ROOT
                     self.menu.ns = MENU_STATE_ROOT
-                    self.logger.debug("選單狀態已重置")
                 
                 if self.test_coordinator:
                     self.test_coordinator.stop_test()
@@ -154,7 +139,6 @@ class RobotController:
     
     def _start_button_test(self) -> int:
         if self.is_phone_mode():
-            self.logger.info("手機模式下，忽略按鈕測試請求")
             return MENU_STATE_ROOT
         
         if self.test_coordinator:
@@ -166,11 +150,11 @@ class RobotController:
     
     def start_phone_test(self) -> bool:
         if self.is_button_mode():
-            self.logger.warning("按鈕模式下不能開始手機測試")
+            self.logger.warning("Cannot start phone test in button mode")
             return False
         
         if not self.test_coordinator:
-            self.logger.error("測試協調器未初始化")
+            self.logger.error("Test coordinator not initialized")
             return False
         
         return self.test_coordinator.start_phone_test()

@@ -77,10 +77,10 @@ class PulseAudioManager:
         try:
             with Pulse('bluetooth-audio') as pulse:
                 return pulse.get_card_by_name(card_name)
-        except PulseError as e:
+        except PulseError:
             return None
         except Exception as e:
-            logger.error(f"獲取卡失敗: {e}")
+            logger.error(f"Get card failed: {e}")
             return None
     
     @staticmethod
@@ -89,7 +89,7 @@ class PulseAudioManager:
             with Pulse('bluetooth-audio') as pulse:
                 card = pulse.get_card_by_name(card_name)
                 if not card:
-                    logger.error(f"未找到卡: {card_name}")
+                    logger.error(f"Card not found: {card_name}")
                     return False
                 
                 target_profile = next(
@@ -98,18 +98,17 @@ class PulseAudioManager:
                 )
                 
                 if not target_profile:
-                    logger.error(f"未找到 profile: {profile_name}")
+                    logger.error(f"Profile not found: {profile_name}")
                     return False
                 
                 pulse.card_profile_set(card, target_profile)
-                logger.debug(f"成功設置 profile {profile_name} for {card_name}")
                 return True
                 
         except PulseError as e:
-            logger.error(f"設置 profile 失敗: {e}")
+            logger.error(f"Set profile failed: {e}")
             return False
         except Exception as e:
-            logger.error(f"設置 profile 失敗: {e}")
+            logger.error(f"Set profile failed: {e}")
             return False
     
     @staticmethod
@@ -118,16 +117,16 @@ class PulseAudioManager:
             with Pulse('bluetooth-audio') as pulse:
                 sink = pulse.get_sink_by_name(sink_name)
                 if not sink:
-                    logger.error(f"未找到 sink: {sink_name}")
+                    logger.error(f"Sink not found: {sink_name}")
                     return False
                 pulse.sink_default_set(sink)
                 return True
                 
         except PulseError as e:
-            logger.error(f"設置預設 sink 失敗: {e}")
+            logger.error(f"Set default sink failed: {e}")
             return False
         except Exception as e:
-            logger.error(f"設置預設 sink 失敗: {e}")
+            logger.error(f"Set default sink failed: {e}")
             return False
     
     @staticmethod
@@ -136,16 +135,16 @@ class PulseAudioManager:
             with Pulse('bluetooth-audio') as pulse:
                 source = pulse.get_source_by_name(source_name)
                 if not source:
-                    logger.error(f"未找到 source: {source_name}")
+                    logger.error(f"Source not found: {source_name}")
                     return False
                 pulse.source_default_set(source)
                 return True
                 
         except PulseError as e:
-            logger.error(f"設置預設 source 失敗: {e}")
+            logger.error(f"Set default source failed: {e}")
             return False
         except Exception as e:
-            logger.error(f"設置預設 source 失敗: {e}")
+            logger.error(f"Set default source failed: {e}")
             return False
     
     @staticmethod
@@ -154,17 +153,16 @@ class PulseAudioManager:
             with Pulse('volume-setter') as pulse:
                 sink = pulse.get_sink_by_name(sink_name)
                 if not sink:
-                    logger.error(f"未找到 sink: {sink_name}")
+                    logger.error(f"Sink not found: {sink_name}")
                     return False
                 pulse.volume_set_all_chans(sink, volume)
-                logger.debug(f"成功設置音量: {sink_name} = {volume}")
                 return True
                 
         except PulseError as e:
-            logger.error(f"設置音量失敗: {e}")
+            logger.error(f"Set volume failed: {e}")
             return False
         except Exception as e:
-            logger.error(f"設置音量失敗: {e}")
+            logger.error(f"Set volume failed: {e}")
             return False
 
 class BluetoothInterfaceAsync:
@@ -191,10 +189,9 @@ class BluetoothInterfaceAsync:
                     member="StartDiscovery"
                 )
             )
-            logger.debug("啟動藍牙掃描")
             return reply.message_type == MessageType.METHOD_RETURN
         except Exception as e:
-            logger.error(f"啟動掃描失敗: {e}")
+            logger.error(f"Start discovery failed: {e}")
             return False
     
     async def stop_discover(self) -> bool:
@@ -207,10 +204,9 @@ class BluetoothInterfaceAsync:
                     member="StopDiscovery"
                 )
             )
-            logger.debug("停止藍牙掃描")
             return reply.message_type == MessageType.METHOD_RETURN
         except Exception as e:
-            logger.error(f"停止掃描失敗: {e}")
+            logger.error(f"Stop discovery failed: {e}")
             return False
     
     def _is_headset_device(self, device_props: Dict) -> bool:
@@ -272,7 +268,7 @@ class BluetoothInterfaceAsync:
             return devices
             
         except Exception as e:
-            logger.error(f"獲取設備列表失敗: {e}")
+            logger.error(f"List devices failed: {e}")
             return []
     
     async def _get_property(self, path: str, interface: str, property_name: str) -> Optional[Variant]:
@@ -289,7 +285,7 @@ class BluetoothInterfaceAsync:
             )
             return reply.body[0] if reply.message_type == MessageType.METHOD_RETURN else None
         except Exception as e:
-            logger.error(f"獲取屬性 {property_name} 失敗: {e}")
+            logger.error(f"Get property {property_name} failed: {e}")
             return None
     
     async def _wait_for_property_change(self, path: str, property_name: str, 
@@ -312,7 +308,6 @@ class BluetoothInterfaceAsync:
             if paired_prop and VariantHelper.extract_bool(paired_prop):
                 return True
             
-            logger.info(f"開始配對 {device_name}")
             pair_reply = await self.bus.call(
                 Message(
                     destination=BluetoothConstants.BLUEZ_SERVICE,
@@ -327,18 +322,17 @@ class BluetoothInterfaceAsync:
                 if error_name == "org.bluez.Error.AlreadyExists":
                     return True
                 else:
-                    logger.error(f"配對 {device_name} 失敗: {error_name}")
+                    logger.error(f"Pair {device_name} failed: {error_name}")
                     return False
             
             await self._wait_for_property_change(
                 device_path, "Paired", True, 
                 timeout=BluetoothConstants.DISCOVERY_TIMEOUT
             )
-            logger.info(f"配對 {device_name} 成功")
             return True
             
         except Exception as e:
-            logger.error(f"配對 {device_name} 失敗: {e}")
+            logger.error(f"Pair {device_name} failed: {e}")
             return False
     
     async def _connect_bluetooth_device(self, device_path: str, device_name: str) -> bool:
@@ -357,14 +351,13 @@ class BluetoothInterfaceAsync:
                     device_path, BluetoothConstants.DEVICE_INTERFACE, "Connected"
                 )
                 if connected_prop and VariantHelper.extract_bool(connected_prop):
-                    logger.info(f"設備 {device_name} 連接成功")
                     return True
             
-            logger.error(f"設備 {device_name} 連接失敗")
+            logger.error(f"Device {device_name} connection failed")
             return False
             
         except Exception as e:
-            logger.error(f"連接 {device_name} 失敗: {e}")
+            logger.error(f"Connect {device_name} failed: {e}")
             return False
     
     async def _wait_for_pulseaudio_card(self, card_name: str, timeout: int = 15):
@@ -374,7 +367,7 @@ class BluetoothInterfaceAsync:
                 return card
             await asyncio.sleep(0.5)
         
-        logger.error(f"等待 PulseAudio 卡 {card_name} 超時")
+        logger.error(f"Wait for PulseAudio card {card_name} timeout")
         return None
     
     def _find_best_hfp_profile(self, card):
@@ -398,10 +391,9 @@ class BluetoothInterfaceAsync:
             
             hfp_profile = self._find_best_hfp_profile(card)
             if not hfp_profile:
-                logger.error(f"設備 {device.device_name} 沒有支援的 HFP profile")
+                logger.error(f"Device {device.device_name} no supported HFP profile")
                 return False
             
-            logger.info(f"設置 profile: {hfp_profile.name}")
             if not PulseAudioManager.set_card_profile(card_name, hfp_profile.name):
                 return False
             
@@ -413,7 +405,7 @@ class BluetoothInterfaceAsync:
             return True
             
         except Exception as e:
-            logger.error(f"設定 HFP for {device.device_name} 失敗: {e}")
+            logger.error(f"Setup HFP for {device.device_name} failed: {e}")
             return False
     
     async def _setup_default_audio_devices(self, device: Device) -> bool:
@@ -426,15 +418,14 @@ class BluetoothInterfaceAsync:
                 source_success = PulseAudioManager.set_default_source(source_name)
                 
                 if sink_success and source_success:
-                    logger.info("成功設置預設音訊設備")
                     return True
                 
-            except Exception as e:
+            except Exception:
                 pass
             
             await asyncio.sleep(0.5)
         
-        logger.error(f"未找到 sink/source: {sink_name}/{source_name}")
+        logger.error(f"Sink/source not found: {sink_name}/{source_name}")
         return False
     
     def _update_device_config(self, device: Device) -> None:
@@ -442,9 +433,8 @@ class BluetoothInterfaceAsync:
             config = load_config()
             config["HEADPHONE_DEVICE_MAC"] = device.mac_address
             save_config(config)
-            logger.info(f"更新配置: HEADPHONE_DEVICE_MAC={device.mac_address}")
         except Exception as e:
-            logger.error(f"更新配置失敗: {e}")
+            logger.error(f"Update config failed: {e}")
     
     async def _apply_device_volume(self) -> bool:
         try:
@@ -452,7 +442,7 @@ class BluetoothInterfaceAsync:
             volume = config.get("VOLUME", 50)
             return await self.set_device_volume(volume)
         except Exception as e:
-            logger.error(f"應用音量失敗: {e}")
+            logger.error(f"Apply volume failed: {e}")
             return False
     
     async def verify_profile(self, card_name: str, expected_profile: str) -> bool:
@@ -469,18 +459,17 @@ class BluetoothInterfaceAsync:
             return False
             
         except subprocess.CalledProcessError as e:
-            logger.error(f"驗證 profile 失敗: {e}")
+            logger.error(f"Verify profile failed: {e}")
             return False
     
     async def connect_device(self, device: Device) -> bool:
-        logger.info(f"正在連線設備 {device.device_name}")
         device_path = f"/org/bluez/hci0/dev_{device.mac_address}"
         
         paired_prop = await self._get_property(
             device_path, BluetoothConstants.DEVICE_INTERFACE, "Paired"
         )
         if paired_prop is None:
-            logger.error(f"設備 {device.device_name} 不存在或無法訪問")
+            logger.error(f"Device {device.device_name} not exist or accessible")
             return False
         
         if not await self._pair_device(device_path, device.device_name):
@@ -498,38 +487,35 @@ class BluetoothInterfaceAsync:
         self._update_device_config(device)
         
         if not await self._apply_device_volume():
-            logger.warning(f"設定音量失敗 for {device.device_name}")
+            logger.warning(f"Set volume failed for {device.device_name}")
         
-        logger.info(f"成功連接並配置設備: {device.device_name}")
         return True
     
     async def set_device_volume(self, volume: int) -> bool:
         try:
             volume = int(volume)
             if not 0 <= volume <= 100:
-                logger.warning("音量需在 0~100")
+                logger.warning("Volume must be 0~100")
                 return False
             
             config = load_config()
             mac = config.get("HEADPHONE_DEVICE_MAC")
             if not mac:
-                logger.warning("未設定 HEADPHONE_DEVICE_MAC")
+                logger.warning("HEADPHONE_DEVICE_MAC not set")
                 return False
             
             sink_name = f"bluez_output.{mac.replace(':', '_')}.1"
             if PulseAudioManager.set_sink_volume(sink_name, volume / 100.0):
                 config["VOLUME"] = volume
                 save_config(config)
-                logger.info(f"更新配置: VOLUME={volume}")
                 return True
             
             return False
             
         except Exception as e:
-            logger.error(f"設定音量失敗: {e}")
+            logger.error(f"Set volume failed: {e}")
             return False
 
-# 創建全局實例
 bt_interface = None
 
 async def get_bt_interface():
