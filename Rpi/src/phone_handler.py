@@ -1,6 +1,5 @@
-import logging
 import json
-import asyncio
+import logging
 from typing import Optional, Dict
 from ble_communication.ble_server import BLEServer
 
@@ -52,12 +51,12 @@ class PhoneHandler:
                 await self.robot_controller.switch_to_button_mode()
                 # 停止當前測試（如果有的話）
                 if self.robot_controller.test_coordinator:
-                    await self.robot_controller.test_coordinator.stop_test()
+                    self.robot_controller.test_coordinator.stop_test()
                 self.logger.info("已切換回板載按鈕操作模式")
             
             elif cmd_type == "start_test":
                 self.logger.info("收到開始測試命令")
-                success = await self.robot_controller.start_phone_test()
+                success = self.robot_controller.start_phone_test()
                 if success:
                     self.robot_controller.oled.clear()
                     self.logger.info("測試已開始，OLED已清空")
@@ -115,7 +114,7 @@ class PhoneHandler:
         """發送測試結果"""
         message = {
             "type": "test_complete",
-            "data": {"vision_score": vision_score}
+            "score": str(vision_score)
         }
         await self._send_message(message)
         await self.robot_controller.show_phone_connected_status()
