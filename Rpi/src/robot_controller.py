@@ -1,7 +1,6 @@
 import logging
 import asyncio
 from typing import Optional
-
 from settings import *
 from data.draw import draw_phone_icon
 from hardwares import Motor, Oled, Sonic, Button
