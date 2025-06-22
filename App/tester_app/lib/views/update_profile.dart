@@ -72,9 +72,18 @@ class UpdateProfileFormState extends State<UpdateProfileForm> {
               TextFormField(
                 controller: controller.ageController,
                 decoration: InputDecoration(
-                  labelText: '${t.get('age')} (${t.get('optional')})',
+                  labelText: t.get('age'),
                 ),
                 keyboardType: TextInputType.number,
+                validator: (value) {
+                  if (value != null && value.isNotEmpty) {
+                    final age = int.tryParse(value) ?? 0;
+                    if (age <= 0) {
+                      return t.get('age_invalid');
+                    }
+                  }
+                  return null;
+                },
               ),
               TextFormField(
                 controller: controller.genderController,

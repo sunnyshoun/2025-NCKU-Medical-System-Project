@@ -93,6 +93,30 @@ class ApiResponse {
 class BleModel {
   final List<BluetoothService> services;
   final BluetoothDevice bluetoothDevice;
+  
+  final Guid serviceUuid = Guid("12345678-abcd-1234-5678-123456789abc");
+  final Guid commandCharUuid = Guid("12345678-abcd-1234-5678-123456789ab1");
+  final Guid dataCharUuid = Guid("12345678-abcd-1234-5678-123456789ab2");
 
-  BleModel({required this.services, required this.bluetoothDevice});
+  late BluetoothCharacteristic commandChar;
+  late BluetoothCharacteristic dataChar;
+
+  BleModel({required this.services, required this.bluetoothDevice}) {
+    for (var service in services) {
+      if (service.uuid == serviceUuid) {
+        for (var char in service.characteristics) {
+          if (char.uuid == commandCharUuid) {
+            commandChar = char;
+          } else if (char.uuid == dataCharUuid) {
+            dataChar = char;
+          }
+        }
+      }
+    }
+  }
+
+  String get deviceName =>
+      bluetoothDevice.platformName.isNotEmpty
+          ? bluetoothDevice.platformName
+          : bluetoothDevice.remoteId.toString();
 }

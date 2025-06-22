@@ -45,7 +45,7 @@ class Menu:
     hide_arrow: bool
     item_list: Sequence[MenuElement]
     item_height: int
-    logger = logging.getLogger('Menu')
+    logger = logging.getLogger('menus')
     logger.setLevel(LOGGER_LEVEL)
 
     def __init__(self, item_list: Sequence[MenuElement], item_height: int):

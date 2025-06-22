@@ -110,4 +110,11 @@ class AudioRecorder:
             return file_path
         return None
 
-audio_recorder = AudioRecorder()
+# 創建全局實例
+audio_recorder = None
+
+def get_recorder():
+    global audio_recorder
+    if audio_recorder is None:
+        audio_recorder = AudioRecorder()
+    return audio_recorder

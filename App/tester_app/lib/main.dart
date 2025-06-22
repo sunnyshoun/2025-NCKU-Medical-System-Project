@@ -45,7 +45,6 @@ class MyApp extends StatelessWidget {
     // update user profile
     final profileResponse = await SpringAPI.getProfile(states.accessToken);
     if (profileResponse.statusCode == 200) {
-      log('got profile: ${profileResponse.data}');
       states.profile = UserProfile.fromJson(
         profileResponse.data as Map<String, dynamic>,
       );

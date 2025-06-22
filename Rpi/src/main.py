@@ -1,45 +1,12 @@
-# Entry of the app running on Raspberry Pi 3B+
-
-from rpi.menu import MainMenu
-from rpi.models import VisionTest
-from rpi.resource import Audio, Bluetooth, SttAPI
-from hardwares import Motor, Oled, Sonic, Button
-from rpi.tester import make_test
+import logging
+import os
+import datetime
+import asyncio
 from settings import *
-import logging, os, datetime
+from robot_controller import RobotController
 
 
-if __name__ == '__main__':
-    logging.getLogger('Adafruit_I2C.Device.Bus.1.Address.0X3C').setLevel(logging.WARNING)
-
-    stt = SttAPI()
-    motor = Motor()
-    sonic = Sonic()
-    btn = Button()
-    oled = Oled()
-    audio = Audio()
-    bluetooth = Bluetooth()
-
-    def start_func():
-        test = VisionTest(
-            motor=motor,
-            oled=oled,
-            sonic=sonic,
-            audio=audio,
-            stt=stt
-        )
-        make_test(test)
-        btn.read_btn()
-        return MENU_STATE_ROOT
-    
-    menu = MainMenu(
-        start_func,
-        btn=btn,
-        oled=oled,
-        audio=audio,
-        bluetooth=bluetooth
-    )
-
+async def setup_logging():
     if not os.path.exists(LOG_FOLDER):
         os.mkdir(LOG_FOLDER)
 
@@ -58,5 +25,44 @@ if __name__ == '__main__':
             format=LOGGER_FORMAT
         )
     
-    while True:
-        menu.loop()
+    logging.getLogger('Adafruit_I2C.Device.Bus.1.Address.0X3C').setLevel(logging.WARNING)
+
+
+async def main():
+    await setup_logging()
+    
+    logger = logging.getLogger("Main")
+    logger.info("Starting EyeDwell vision test robot...")
+    
+    controller = RobotController()
+    
+    try:
+        await controller.start()
+        logger.info("System started, waiting for operations...")
+        
+        while controller.is_running:
+            await asyncio.sleep(1)
+            
+    except KeyboardInterrupt:
+        logger.info("Received termination signal, shutting down...")
+    except Exception as e:
+        logger.error(f"System execution error: {e}")
+        import traceback
+        logger.error(f"Error details: {traceback.format_exc()}")
+    finally:
+        try:
+            await controller.stop()
+            logger.info("System safely shutdown")
+        except Exception as e:
+            logger.error(f"Error during shutdown: {e}")
+
+
+if __name__ == '__main__':
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("Program interrupted")
+    except Exception as e:
+        print(f"Program execution failed: {e}")
+        import traceback
+        traceback.print_exc()

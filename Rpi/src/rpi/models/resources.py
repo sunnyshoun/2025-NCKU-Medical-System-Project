@@ -1,6 +1,6 @@
 from PIL.Image import Image
 from audio.model import Language
-from bluetooth.model import Device
+from bluetooth_headset.model import Device
 
 # --- hardware ---
 class IButton:
@@ -39,6 +39,10 @@ class IAudio:
         raise NotImplementedError('Calling the interface method `get_volume`')
 
 class IBluetooth:
+    def start_discover(self, device: Device) -> bool:
+        raise NotImplementedError('Calling the interface method `start_discover`')
+    def stop_discover(self, device: Device) -> bool:
+        raise NotImplementedError('Calling the interface method `stop_discover`')
     def list_bt_device(self) -> list[Device]:
         raise NotImplementedError('Calling the interface method `list_bt_device`')
     def connect_bt_device(self, device: Device) -> bool:

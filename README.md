@@ -1,4 +1,4 @@
-# 睛益求居 - 智能居家視力檢測小幫手
+# EyeDwell 睛益求居 - 智能居家視力檢測小幫手
 
 ## 專案概述
 
@@ -40,8 +40,8 @@ graph TD
     end
 
     %% 資料流
-    A -->|Bluetooth: 操控指令| F
-    F -->|Bluetooth: 測試結果| A
+    A -->|BLE: 操控指令| F
+    F -->|BLE: 測試結果| A
     A -->|REST: 資料請求/問題| B
     B -->|JDBC: 存取資料| C
     C -->|JDBC: 回傳資料| B
@@ -61,7 +61,7 @@ graph TD
 1. **[Rpi](./Rpi/README.md)**  
    - **功能**：控制視力檢測機器人，支援語音交互、藍牙連線和 OLED 顯示，執行視力測試流程。  
    - **技術棧**：Python、RPi.GPIO、語音處理庫、藍牙庫。  
-   - **用途**：處理硬體交互，將測試結果傳送至 Spring 後端。
+   - **用途**：處理硬體交互，將測試結果透過 BLE 傳至 Flutter App。
 
 2. **[Arduino](./Arduino/README.md)**  
    - **功能**：根據 Rpi 透過 Serial Port 傳送過來的資訊控制馬達，與 Rpi 協同進行視力測試。  
@@ -106,7 +106,7 @@ graph TD
    - 參考各組件的 `README.md` 文件，安裝依賴並配置環境。
 
 3. **啟動服務**：
-   - **Rpi**：運行 `Rpi/src/main.py`。
+   - **Rpi**：運行 `Rpi/startup.sh`。
    - **Backend**：運行 `docker-compose up -d`
    - **Flutter**：運行 `flutter run`。
    - **Arduino**：燒錄程式碼至設備（參見 `Arduino/README.md`）。

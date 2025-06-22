@@ -7,6 +7,7 @@ import 'package:tester_app/models/user_models.dart';
 import 'package:tester_app/networks/spring.dart';
 
 class RegistrationController {
+  final formKey = GlobalKey<FormState>();
   final TextEditingController accountController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
   final TextEditingController emailController = TextEditingController();
@@ -90,7 +91,7 @@ class RegistrationController {
     final username = accountController.text;
     final password = passwordController.text;
     final email = emailController.text;
-    final age = int.tryParse(ageController.text);
+    final age = int.tryParse(ageController.text) ?? 0;
     final gender = genderController.text;
     final job = jobController.text;
     AppLocalizations t = AppLocalizations(generalState.locale);

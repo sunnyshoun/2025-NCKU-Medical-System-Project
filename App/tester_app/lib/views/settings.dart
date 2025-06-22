@@ -1,9 +1,7 @@
 import 'dart:developer';
 import 'package:flutter/material.dart';
-import 'package:tester_app/controllers/bluetooth_controller.dart';
 import 'package:tester_app/controllers/settings_controller.dart';
 import 'package:tester_app/models/state_models.dart';
-import 'package:tester_app/views/bluetooth_page.dart';
 import '../configs/app_localizations.dart';
 import 'package:tester_app/views/update_profile.dart';
 
@@ -68,31 +66,6 @@ class _SettingsPageState extends State<SettingsPage> {
               divisions: 6,
               label: states.fontSize.round().toString(),
               onChanged: (val) => _controller.onFontSizeChanged(val),
-            ),
-            SizedBox(height: states.fontSize*2),
-            SizedBox(
-              width: double.infinity,
-              child: TextButton.icon(
-                style: ButtonStyle(alignment: Alignment.centerLeft),
-                icon: const Icon(Icons.arrow_forward_ios),
-                label: Text(
-                  t.get('bluetooth'),
-                  style: TextStyle(fontSize: states.fontSize),
-                ),
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder:
-                          (context) => BluetoothPage(
-                            controller: BluetoothController(
-                              blueStates: BlueListModel(),
-                              generalStates: states,
-                            ),
-                          ),
-                    ),
-                  );
-                },
-              ),
             ),
             const Spacer(),
             if (states.profile != null)

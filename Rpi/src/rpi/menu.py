@@ -1,13 +1,12 @@
-import time
-import threading
+import logging
+import asyncio
+from typing import Callable
+from PIL.Image import Image as Img
 from .models import Menu, TextMenuElement, IconMenuElement, MenuBase
-from data.draw import draw_bluetooth_icon, draw_start_icon, draw_volume_icon, cross, check, draw_loading_frames
-from bluetooth.model import Device
+from data.draw import *
+from bluetooth_headset.model import Device
 from config_manager import get_config_value
 from settings import *
-import logging
-from typing import Callable
-from PIL.Image import Image
 
 _LOGGER = logging.getLogger('menu')
 
@@ -19,27 +18,22 @@ def volume_enter_callback() -> int:
     _LOGGER.info('Enter volume')
     return MENU_STATE_VOLUME
 
-def wrap_bluetooth_select_callback(bt_device: Device, menu: 'MainMenu') -> Callable[[], int]:
-    def wrapped() -> int:
-        animation_thread = threading.Thread(target=menu.show_loading_animation)
-        animation_thread.start()
-        if menu.bluetooth.connect_bt_device(bt_device):
-            menu.bt_device = bt_device
-            _LOGGER.info(f'Connect to \"{bt_device.device_name}\"')
-        else:
-            menu.bt_device = None
-            _LOGGER.info(f'Fail to connect \"{bt_device.device_name}\"')
-        menu.stop_loading_animation()
-        animation_thread.join()
-        return MENU_STATE_ROOT
-    return wrapped
+async def wrap_bluetooth_select_callback(bt_device: Device, menu: 'MainMenu') -> int:
+    asyncio.create_task(menu.show_loading_animation())
+    success = await menu.bluetooth.connect_bt_device(bt_device)
+    if success:
+        menu.bt_device = bt_device
+        _LOGGER.info(f'Connect to \"{bt_device.device_name}\"')
+    else:
+        menu.bt_device = None
+        _LOGGER.info(f'Fail to connect \"{bt_device.device_name}\"')
+    await menu.stop_loading_animation()
+    return MENU_STATE_ROOT
 
-def wrap_volume_select_callback(menu: 'MainMenu', p: int) -> Callable[[], int]:
-    def wrapped() -> int:
-        menu.audio.set_volume(p)
-        _LOGGER.info(f'Set volume to {p}%')
-        return MENU_STATE_ROOT
-    return wrapped
+async def wrap_volume_select_callback(menu: 'MainMenu', p: int) -> int:
+    _LOGGER.info(f'Set volume to {p}%')
+    await menu.audio.set_volume(p)
+    return MENU_STATE_ROOT
 
 class MainMenu(MenuBase):
     root_menu: Menu
@@ -50,31 +44,32 @@ class MainMenu(MenuBase):
     ns: int
 
     bt_device: Device | None
+    robot_controller: any
 
-    loading_frames: list[Image]
+    loading_frames: list[Img]
     is_loading: bool
-    update_thread: threading.Thread  # 後台更新線程
-    stop_update: threading.Event  # 控制更新線程停止
-    is_navigating: bool  # 標記是否正在上下切換
-    navigation_timer: threading.Timer  # 延遲重置 is_navigating
-    oled_lock: threading.Lock  # OLED 訪問鎖
+    is_navigating: bool
+    stop_update: asyncio.Event
+    oled_lock: asyncio.Lock
 
-    def __init__(self, tester_func: Callable[[], int], *args, **kwargs) -> None:
+    def __init__(self, tester_func: Callable[[], int], robot_controller=None, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-
+        
+        self.robot_controller = robot_controller
+        
         root_ele = [
             IconMenuElement(draw_start_icon(), tester_func, 'start'),
             IconMenuElement(draw_bluetooth_icon(), bluetooth_enter_callback, 'bluetooth'),
-            IconMenuElement(draw_volume_icon(), volume_enter_callback, 'volume')
+            IconMenuElement(draw_volume_icon(), volume_enter_callback, 'volume'),
         ]
         self.root_menu = Menu(root_ele, SCREEN_HEIGHT)
 
         self.bluetooth_menu = Menu([], MENU_TEXT_HEIGHT)
 
         volume_ele = [
-            TextMenuElement(f'{p}%', wrap_volume_select_callback(self, p)) for p in range(0, 101, 5)
+            TextMenuElement(f'{p}%', lambda x=p: wrap_volume_select_callback(self, x)) for p in range(0, 101, 5)
         ]
-
+        
         self.volume_menu = Menu(volume_ele, MENU_TEXT_HEIGHT)
 
         self.state = MENU_STATE_ROOT
@@ -84,70 +79,72 @@ class MainMenu(MenuBase):
         
         self.loading_frames = draw_loading_frames()
         self.is_loading = False
-        self.stop_update = threading.Event()
         self.is_navigating = False
-        self.navigation_timer = None
-        self.oled_lock = threading.Lock()
-        default_device = Device('default', get_config_value('HEADPHONE_DEVICE_MAC') or 'none')
-        
-        connect_result = self.bluetooth.connect_bt_device(default_device)
-        if connect_result:
-            self.bt_device = default_device
-        
-        _LOGGER.info(f'Connect to default device: {connect_result}')
-        self.refresh_bluetooth()
+        self.stop_update = asyncio.Event()
+        self.oled_lock = asyncio.Lock()
 
-    def start_bluetooth_update(self):
-        """啟動後台線程，每 3 秒更新藍牙設備列表"""
+    async def initialize_bluetooth(self):
+        try:
+            default_device = Device('default', get_config_value('HEADPHONE_DEVICE_MAC') or 'none')
+            connect_result = await self.bluetooth.connect_bt_device(default_device)
+            if connect_result:
+                self.bt_device = default_device
+            _LOGGER.info(f'Connect to default device: {connect_result}')
+        except Exception as e:
+            _LOGGER.error(f'Failed to connect to default device: {e}')
+
+    def is_phone_connected(self) -> bool:
+        return self.robot_controller and self.robot_controller.phone_handler and self.robot_controller.phone_handler.is_connected()
+
+    async def start_bluetooth_update(self):
         self.stop_update.clear()
-        self.update_thread = threading.Thread(target=self._update_bluetooth_loop)
-        self.update_thread.daemon = True
-        self.update_thread.start()
-        _LOGGER.info("Started bluetooth update thread")
+        _LOGGER.info("Started bluetooth update task")
+        asyncio.create_task(self._update_bluetooth_loop())
 
-    def stop_bluetooth_update(self):
+    async def stop_bluetooth_update(self):
         self.stop_update.set()
-        _LOGGER.info("Requested stop for bluetooth update thread")
+        _LOGGER.info("Requested stop for bluetooth update task")
 
-    def _update_bluetooth_loop(self):
-        """後台循環，每 3 秒更新藍牙設備列表"""
+    async def _update_bluetooth_loop(self):
         while not self.stop_update.is_set():
             if self.state == MENU_STATE_BT and not self.is_loading and not self.is_navigating:
-                if not self.stop_update.is_set():
-                    _LOGGER.debug("Conditions met, refreshing bluetooth")
-                    self.refresh_bluetooth()
-            time.sleep(3)
+                _LOGGER.debug("Conditions met, refreshing bluetooth")
+                await self.refresh_bluetooth()
+            await asyncio.sleep(3)
 
-    def _reset_navigation(self):
-        """重置 is_navigating 標誌，恢復自動更新"""
+    async def _reset_navigation(self):
         self.is_navigating = False
         _LOGGER.debug("Navigation ended, resuming bluetooth updates")
-        self.navigation_timer = None
 
-    def show_loading_animation(self):
+    async def show_loading_animation(self):
         _LOGGER.info('Starting loading animation')
         self.is_loading = True
         frame_interval = 0.05
         frame_count = len(self.loading_frames)
         frame_index = 0
         while self.is_loading:
-            with self.oled_lock:
+            async with self.oled_lock:
                 self.oled.clear()
                 self.oled.set_img(self.loading_frames[frame_index])
                 self.oled.display()
             frame_index = (frame_index + 1) % frame_count
-            time.sleep(frame_interval)
+            await asyncio.sleep(frame_interval)
 
-    def stop_loading_animation(self):
+    async def stop_loading_animation(self):
         _LOGGER.info('Stopping loading animation')
         self.is_loading = False
-        with self.oled_lock:
+        async with self.oled_lock:
             self.oled.clear()
             self.oled.display()
+        
 
-    def refresh_bluetooth(self):
+    async def refresh_bluetooth(self):
         _LOGGER.debug('Refresh bluetooth')
-        bluetooth_device_list = self.bluetooth.list_bt_device()
+        try:
+            bluetooth_device_list = await self.bluetooth.list_bt_device()
+        except Exception as e:
+            _LOGGER.error(f'Failed to list bluetooth devices: {e}')
+            bluetooth_device_list = []
         
         current_device_name = None
         if self.bluetooth_menu.item_list and 0 <= self.bluetooth_menu.select_index < len(self.bluetooth_menu.item_list):
@@ -160,7 +157,7 @@ class MainMenu(MenuBase):
             bluetooth_ele = [
                 TextMenuElement(
                     text=device.device_name,
-                    call_back=wrap_bluetooth_select_callback(device, self)
+                    call_back=lambda device=device: wrap_bluetooth_select_callback(device, self)
                 ) for device in bluetooth_device_list
             ]
 
@@ -184,9 +181,8 @@ class MainMenu(MenuBase):
 
         _LOGGER.debug(f'Set bluetooth list to {[item.title for item in bluetooth_ele]}')
 
-        # 如果在藍牙選單中，重繪畫面
         if self.state == MENU_STATE_BT:
-            with self.oled_lock:
+            async with self.oled_lock:
                 self.oled.clear()
                 self.oled.set_img(self.bluetooth_menu.list_img())
                 self.oled.display()
@@ -202,10 +198,17 @@ class MainMenu(MenuBase):
             raise ValueError(f'Unknown state: {self.state}')
         return r
 
-    def loop(self):
-        _LOGGER.info(f'Enter loop with cs: {self.state}, ns: {self.ns}')
+    async def loop(self):
+        if self.robot_controller:
+            if self.robot_controller.is_phone_mode() or \
+            (self.robot_controller.test_coordinator and self.robot_controller.test_coordinator.is_test_active()):
+                await asyncio.sleep(0.5)  # 短暫等待，減少 CPU 使用
+                return
+        
+        _LOGGER.debug(f'Enter loop with cs: {self.state}, ns: {self.ns}')
+        
         if self.bt_device is None:
-            _LOGGER.debug('Not connected to device')
+            _LOGGER.debug('Not connected to bluetooth device')
             if self.state != MENU_STATE_BT and self.ns != MENU_STATE_BT:
                 self.ns = MENU_STATE_ROOT
                 self.root_menu.select_index = 1
@@ -223,61 +226,58 @@ class MainMenu(MenuBase):
             if goto_func is None:
                 raise ValueError(f'Unknown state: {self.ns}')
             else:
-                goto_func()
+                await goto_func()
 
         self.state = self.ns
         current_menu = self._current_menu()
         _LOGGER.debug(f'Selected index: {current_menu.select_index}')
 
-        if self.state == MENU_STATE_ROOT and current_menu.select_index == 1:
-            if self.bt_device is None:
-                current_menu.item_list[1].img = cross(draw_bluetooth_icon())
-            else:
-                current_menu.item_list[1].img = check(draw_bluetooth_icon())
+        if self.state == MENU_STATE_ROOT:
+            if current_menu.select_index == 1:
+                if self.bt_device is None:
+                    current_menu.item_list[1].img = cross(draw_bluetooth_icon())
+                else:
+                    current_menu.item_list[1].img = check(draw_bluetooth_icon())
 
-        with self.oled_lock:  # 保護 OLED 訪問
+        async with self.oled_lock:
             self.oled.clear()
             self.oled.set_img(current_menu.list_img())
             self.oled.display()
 
-        btn = self.btn.read_btn()
-        _LOGGER.info(f'Got btn {btn}')
-        btn_events = {
-            BTN_UP: current_menu.move_up,
-            BTN_CONFIRM: current_menu.select,
-            BTN_DOWN: current_menu.move_down
-        }
-        callee = btn_events.get(btn)
-        if callee is None:
-            raise ValueError(f'Unknown btn: {btn}')
-        else:
-            if btn in (BTN_UP, BTN_DOWN):
-                self.is_navigating = True
-                _LOGGER.debug("Navigation started, pausing bluetooth updates")
-                if self.navigation_timer is not None:
-                    self.navigation_timer.cancel()
-                self.navigation_timer = threading.Timer(3.0, self._reset_navigation)
-                self.navigation_timer.start()
-            next_state = callee()
-            if next_state is not None:
-                self.ns = next_state
+        try:
+            btn = await asyncio.to_thread(self.btn.read_btn)
+            _LOGGER.debug(f'Got btn {btn}')
+            btn_events = {
+                BTN_UP: current_menu.move_up,
+                BTN_CONFIRM: current_menu.select,
+                BTN_DOWN: current_menu.move_down
+            }
+            callee = btn_events.get(btn)
+            if callee is None:
+                raise ValueError(f'Unknown btn: {btn}')
+            else:
+                if btn in (BTN_UP, BTN_DOWN):
+                    self.is_navigating = True
+                    _LOGGER.debug("Navigation started, pausing bluetooth updates")
+                    await self._reset_navigation()
+                next_state = await callee() if asyncio.iscoroutinefunction(callee) else callee()
+                if next_state is not None:
+                    if asyncio.iscoroutine(next_state):
+                        next_state = await next_state
+                    self.ns = next_state
+        except Exception as e:
+            _LOGGER.error(f'Button handling error: {e}')
+            await asyncio.sleep(0.1)
 
-    def _goto_volume(self):
+    async def _goto_volume(self):
         _LOGGER.info('Change to volume')
         self.volume_menu.select_index = self.audio.get_volume() // 5
 
-    def _goto_bt(self):
+    async def _goto_bt(self):
         _LOGGER.info('Change to bt')
-        self.refresh_bluetooth()
-        self.start_bluetooth_update()
+        await self.refresh_bluetooth()
+        await self.start_bluetooth_update()
 
-    def _goto_root(self):
+    async def _goto_root(self):
         _LOGGER.info('Change to root')
-        self.stop_bluetooth_update()
-
-    def __del__(self):
-        """清理資源"""
-        self.stop_bluetooth_update()
-        if self.navigation_timer is not None:
-            self.navigation_timer.cancel()
-        _LOGGER.info("MainMenu destroyed")
+        await self.stop_bluetooth_update()
