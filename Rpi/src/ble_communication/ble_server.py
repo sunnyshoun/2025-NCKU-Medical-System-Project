@@ -8,7 +8,6 @@ from dbus_fast.introspection import Node
 
 logger = logging.getLogger("BLE_Server")
 
-# D-Bus 和 BlueZ 常數
 BLUEZ_SERVICE = "org.bluez"
 ADAPTER_PATH = "/org/bluez/hci0"
 GATT_MANAGER_IFACE = "org.bluez.GattManager1"
@@ -23,78 +22,54 @@ ADVERTISEMENT_IFACE = "org.bluez.LEAdvertisement1"
 AGENT_MANAGER_IFACE = "org.bluez.AgentManager1"
 AGENT_IFACE = "org.bluez.Agent1"
 
-# EyeDwell UUID
 SERVICE_UUID = "12345678-abcd-1234-5678-123456789abc"
 COMMAND_CHAR_UUID = "12345678-abcd-1234-5678-123456789ab1"
 DATA_CHAR_UUID = "12345678-abcd-1234-5678-123456789ab2"
 
 
 class PairingAgent(ServiceInterface):
-    """修正的配對代理，處理現代設備的配對過程"""
-    
     def __init__(self):
         super().__init__(AGENT_IFACE)
         self.path = "/org/eyedwell/agent"
 
     @method()
     def Release(self):
-        """配對代理被釋放時調用"""
-        logger.debug("配對代理已釋放")
+        pass
 
     @method()
     def AuthorizeService(self, device: "o", uuid: "s"):
-        """只授權 EyeDwell 服務，拒絕所有其他服務"""
-        logger.info(f"設備 {device} 請求服務 {uuid}")
-        
         uuid_lower = uuid.lower()
-        
         if uuid_lower == SERVICE_UUID.lower():
-            logger.info(f"授權 EyeDwell 服務 {uuid}")
             return
-        
-        logger.info(f"拒絕服務: {uuid}")
-        raise Exception(f"只允許 EyeDwell 服務，拒絕服務 {uuid}")
+        raise Exception(f"Only EyeDwell service allowed, denied service {uuid}")
 
     @method()
     def RequestPinCode(self, device: "o") -> "s":
-        """請求 PIN 碼（舊式配對）- 通常不會被調用"""
-        logger.info(f"設備 {device} 請求 PIN 碼（舊式配對）")
         return "0000"
 
     @method()
     def DisplayPinCode(self, device: "o", pincode: "s"):
-        """顯示 PIN 碼"""
-        logger.info(f"設備 {device} 的 PIN 碼: {pincode}")
+        pass
 
     @method()
     def RequestPasskey(self, device: "o") -> "u":
-        """請求密鑰（6位數字）- 較少使用"""
-        logger.info(f"設備 {device} 請求密鑰")
         return 123456
 
     @method()
     def DisplayPasskey(self, device: "o", passkey: "u", entered: "q"):
-        """顯示密鑰進度"""
-        logger.info(f"設備 {device} 的密鑰: {passkey:06d} (已輸入: {entered})")
+        pass
 
     @method()
     def RequestConfirmation(self, device: "o", passkey: "u"):
-        """請求確認配對 - 這是現代設備最常用的方法"""
-        logger.info(f"自動確認設備 {device} 的配對，密鑰: {passkey:06d}")
-        # 自動確認配對
         return
 
     @method()
     def RequestAuthorization(self, device: "o"):
-        """請求授權連接"""
-        logger.info(f"自動授權設備 {device} 連接")
-        # 自動授權連接
         return
 
     @method()
     def Cancel(self):
-        """取消配對過程"""
-        logger.info("配對過程被取消")
+        pass
 
     def get_path(self):
         return self.path
@@ -128,7 +103,7 @@ class Advertisement(ServiceInterface):
 
     @method()
     def Release(self):
-        logger.debug("廣告已釋放")
+        pass
 
     def get_path(self):
         return self.path
@@ -144,11 +119,8 @@ class GattApplication(ServiceInterface):
     @method()
     async def GetManagedObjects(self) -> "a{oa{sa{sv}}}":
         result = {}
-        logger.debug("GetManagedObjects 被調用")
         
         for path, service in self.services.items():
-            logger.debug(f"處理服務路徑: {path}")
-            # 手動構建服務屬性
             service_props = {
                 "UUID": Variant("s", service.UUID),
                 "Primary": Variant("b", service.Primary),
@@ -156,9 +128,7 @@ class GattApplication(ServiceInterface):
             }
             result[path] = {GATT_SERVICE_IFACE: service_props}
             
-            # 獲取特徵屬性
             for char_path, char in service.characteristics.items():
-                logger.debug(f"處理特徵路徑: {char_path}")
                 char_props = {
                     "Service": Variant("o", char.Service),
                     "UUID": Variant("s", char.UUID),
@@ -168,7 +138,6 @@ class GattApplication(ServiceInterface):
                 }
                 result[char_path] = {GATT_CHARACTERISTIC_IFACE: char_props}
         
-        logger.debug(f"GetManagedObjects 返回: {result}")
         return result
 
     def add_service(self, service):
@@ -276,43 +245,34 @@ class EyeDwellCharacteristic(ServiceInterface):
 class CommandCharacteristic(EyeDwellCharacteristic):
     def __init__(self, bus, ble_server):
         super().__init__(bus, COMMAND_CHAR_UUID, ["write"], "/org/eyedwell/app/service0/char0", ble_server)
-        self.input_buffer = bytearray()  # 初始化輸入緩衝區
+        self.input_buffer = bytearray()
 
     async def on_write(self, data: bytes):
         if not self.ble_server:
-            logger.error("BLE 服務器未設置")
+            logger.error("BLE server not set")
             return
 
-        # 將接收到的數據添加到緩衝區
         self.input_buffer.extend(data)
-        logger.debug(f"接收到數據: {data.decode('utf-8', errors='ignore')}, 當前緩衝區: {self.input_buffer.decode('utf-8', errors='ignore')}")
 
-        # 檢查緩衝區中的完整封包
         while b'{' in self.input_buffer and b'}' in self.input_buffer:
             start_idx = self.input_buffer.index(b'{')
             end_idx = self.input_buffer.index(b'}', start_idx) + 1
             packet = self.input_buffer[start_idx:end_idx]
             
             try:
-                # 嘗試解碼為 UTF-8 並調用回調函數
                 packet_str = packet.decode("utf-8")
                 if self.ble_server.on_command_received:
                     await self.ble_server.on_command_received(packet_str)
-                logger.info(f"處理完整封包: {packet_str}")
             except UnicodeDecodeError as e:
-                logger.error(f"封包解碼失敗: {e}")
-                # 清空緩衝區以避免無效數據累積
+                logger.error(f"Packet decode failed: {e}")
                 self.input_buffer = bytearray()
                 break
             except Exception as e:
-                logger.error(f"處理封包時發生錯誤: {e}")
+                logger.error(f"Error processing packet: {e}")
             
-            # 移除已處理的封包
             self.input_buffer = self.input_buffer[end_idx:]
         
-        # 如果緩衝區過長（例如超過 1KB），清空以防止溢出
         if len(self.input_buffer) > 1024:
-            logger.warning("輸入緩衝區過長，清空緩衝區")
             self.input_buffer = bytearray()
 
 
@@ -342,9 +302,9 @@ class BLEServer:
             await self._register_advertisement()
             await self._register_gatt_application()
             subprocess.call(["sudo", "hciconfig", "hci0", "class", "0x000100"])
-            logger.info("BLE 服務器啟動成功")
+            logger.info("BLE server started successfully")
         except Exception as e:
-            logger.error(f"啟動失敗: {e}")
+            logger.error(f"Start failed: {e}")
             await self.stop_server()
             raise
 
@@ -359,43 +319,37 @@ class BLEServer:
             if self.bus:
                 self.bus.disconnect()
                 self.bus = None
-            logger.info("BLE 服務器已停止")
         except Exception as e:
-            logger.error(f"停止失敗: {e}")
+            logger.error(f"Stop failed: {e}")
 
     async def _connect_dbus(self):
         try:
             self.bus = await MessageBus(bus_type=BusType.SYSTEM).connect()
             result = await self.bus.request_name("org.eyedwell.BLEServer")
             if result == RequestNameReply.PRIMARY_OWNER:
-                logger.info("D-Bus 名稱 org.eyedwell.BLEServer 已成功請求")
+                pass
             elif result == RequestNameReply.IN_QUEUE:
-                logger.warning("D-Bus 名稱 org.eyedwell.BLEServer 已在隊列中，等待其他進程釋放")
-                raise Exception("D-Bus 名稱已在隊列中，請檢查是否有其他實例運行")
+                raise Exception("D-Bus name queued, check for other instances")
             elif result == RequestNameReply.EXISTS:
-                logger.error("D-Bus 名稱 org.eyedwell.BLEServer 已被其他進程佔用")
-                raise Exception("D-Bus 名稱已被佔用，請終止其他實例")
+                raise Exception("D-Bus name occupied, terminate other instances")
             elif result == RequestNameReply.ALREADY_OWNER:
-                logger.warning("D-Bus 名稱 org.eyedwell.BLEServer 已被當前進程擁有")
+                pass
             else:
-                raise Exception(f"請求 D-Bus 名稱 org.eyedwell.BLEServer 失敗，返回碼: {result}")
+                raise Exception(f"D-Bus name request failed: {result}")
         except Exception as e:
-            logger.error(f"D-Bus 連接或名稱請求失敗: {e}")
+            logger.error(f"D-Bus connection failed: {e}")
             raise
 
     async def _setup_adapter(self):
-        """設置藍牙適配器屬性"""
         try:
-            # 基本設置
             await self._set_property("Powered", Variant("b", True))
             await self._set_property("Alias", Variant("s", self.device_name))
             await self._set_property("Discoverable", Variant("b", True))
             await self._set_property("Pairable", Variant("b", True))
-            await self._set_property("PairableTimeout", Variant("u", 0))  # 永遠可配對
-            await self._set_property("DiscoverableTimeout", Variant("u", 0))  # 永遠可發現
-            logger.info(f"適配器設置完成，設備名稱: {self.device_name}")
+            await self._set_property("PairableTimeout", Variant("u", 0))
+            await self._set_property("DiscoverableTimeout", Variant("u", 0))
         except Exception as e:
-            logger.error(f"設置適配器失敗: {e}")
+            logger.error(f"Adapter setup failed: {e}")
             raise
 
     async def _set_property(self, prop_name: str, value: Variant):
@@ -410,10 +364,9 @@ class BLEServer:
             )
         )
         if reply and reply.message_type == MessageType.ERROR:
-            logger.error(f"設置 {prop_name} 失敗: {reply.body[0]}")
+            logger.error(f"Set {prop_name} failed: {reply.body[0]}")
 
     async def _register_pairing_agent(self):
-        """註冊配對代理"""
         try:
             self.pairing_agent = PairingAgent()
             self.bus.export(self.pairing_agent.get_path(), self.pairing_agent)
@@ -432,10 +385,8 @@ class BLEServer:
             )
             
             if reply and reply.message_type == MessageType.ERROR:
-                logger.error(f"註冊配對代理失敗: {reply.body[0]}")
-                raise Exception(f"註冊配對代理失敗: {reply.body[0]}")
+                raise Exception(f"Register agent failed: {reply.body[0]}")
             
-            # 設置為默認代理
             reply = await self.bus.call(
                 Message(
                     destination=BLUEZ_SERVICE,
@@ -448,19 +399,14 @@ class BLEServer:
             )
             
             if reply and reply.message_type == MessageType.ERROR:
-                logger.warning(f"設置默認代理失敗: {reply.body[0]}")
-                raise Exception(f"設置默認代理失敗: {reply.body[0]}")
-            
-            logger.info(f"配對代理已註冊，使用能力: {capability}")
+                raise Exception(f"Set default agent failed: {reply.body[0]}")
             
         except Exception as e:
-            logger.error(f"註冊配對代理錯誤: {e}")
+            logger.error(f"Register pairing agent error: {e}")
             raise
 
     async def _unregister_pairing_agent(self):
-        """取消註冊配對代理"""
         if not self.bus or not self.pairing_agent:
-            logger.debug("無配對代理物件，跳過取消註冊")
             return
         
         try:
@@ -475,25 +421,20 @@ class BLEServer:
                 )
             )
             
-            if reply and reply.message_type == MessageType.ERROR:
-                logger.debug(f"取消配對代理註冊失敗: {reply.body[0]}")
-            else:
-                logger.info("配對代理已取消註冊")
-            
             self.bus.unexport(self.pairing_agent.get_path())
             self.pairing_agent = None
             
         except Exception as e:
-            logger.error(f"取消配對代理註冊錯誤: {e}")
+            logger.error(f"Unregister pairing agent error: {e}")
 
     async def _register_advertisement(self):
         if not self.bus:
-            logger.error("D-Bus 未連接，無法註冊廣告")
+            logger.error("D-Bus not connected, cannot register advertisement")
             return
         try:
             self.advertisement = Advertisement(0, self.device_name)
             self.bus.export(self.advertisement.get_path(), self.advertisement)
-            # 提供 LEAdvertisingManager1 的內省數據
+            
             introspection = Node.parse("""
                 <node>
                     <interface name="org.bluez.LEAdvertisingManager1">
@@ -511,16 +452,13 @@ class BLEServer:
             ad_manager = obj.get_interface(ADVERTISING_MANAGER_IFACE)
             reply = await ad_manager.call_register_advertisement(self.advertisement.get_path(), {})
             if reply and reply.message_type == MessageType.ERROR:
-                logger.error(f"註冊廣告失敗: {reply.body[0]}")
-                raise Exception(f"註冊廣告失敗: {reply.body[0]}")
-            logger.info("廣告已註冊")
+                raise Exception(f"Register advertisement failed: {reply.body[0]}")
         except Exception as e:
-            logger.error(f"註冊廣告錯誤: {e}")
+            logger.error(f"Register advertisement error: {e}")
             raise
 
     async def _unregister_advertisement(self):
         if not self.bus or not self.advertisement:
-            logger.debug("無廣告物件，跳過取消註冊")
             return
         try:
             introspection = Node.parse("""
@@ -535,14 +473,11 @@ class BLEServer:
             obj = self.bus.get_proxy_object(BLUEZ_SERVICE, ADAPTER_PATH, introspection)
             ad_manager = obj.get_interface(ADVERTISING_MANAGER_IFACE)
             reply = await ad_manager.call_unregister_advertisement(self.advertisement.get_path())
-            if reply and reply.message_type == MessageType.ERROR:
-                logger.debug(f"取消廣告註冊失敗: {reply.body[0]}")
-            else:
-                logger.info("廣告已取消註冊")
+            
             self.bus.unexport(self.advertisement.get_path())
             self.advertisement = None
         except Exception as e:
-            logger.error(f"取消廣告註冊錯誤: {e}")
+            logger.error(f"Unregister advertisement error: {e}")
 
     async def _create_gatt_services(self):
         self.gatt_app = GattApplication(self.bus)
@@ -552,7 +487,6 @@ class BLEServer:
         service.add_characteristic(self.data_char)
         self.gatt_app.add_service(service)
         
-        # 導出所有對象
         self.bus.export(self.gatt_app.path, self.gatt_app)
         self.bus.export(service.path, service)
         for char in service.characteristics.values():
@@ -570,7 +504,6 @@ class BLEServer:
             )
         )
         if reply and reply.message_type == MessageType.ERROR:
-            logger.error(f"註冊 GATT 應用失敗: {reply.body[0]}")
             raise Exception(reply.body[0])
 
     async def _unregister_gatt_application(self):
@@ -585,11 +518,8 @@ class BLEServer:
                     body=["/org/eyedwell/app"],
                 )
             )
-            if reply and reply.message_type == MessageType.ERROR:
-                logger.debug(f"取消註冊失敗: {reply.body[0]}")
 
     async def _set_device_property(self, device_path: str, prop_name: str, value: Variant):
-        """設置設備屬性"""
         try:
             reply = await self.bus.call(
                 Message(
@@ -602,9 +532,9 @@ class BLEServer:
                 )
             )
             if reply and reply.message_type == MessageType.ERROR:
-                logger.error(f"設置設備 {device_path} 的 {prop_name} 失敗: {reply.body[0]}")
+                logger.error(f"Set device {device_path} {prop_name} failed: {reply.body[0]}")
         except Exception as e:
-            logger.error(f"設置設備屬性錯誤: {e}")
+            logger.error(f"Set device property error: {e}")
 
     async def send_data(self, data: bytes) -> bool:
         if not self.data_char:
