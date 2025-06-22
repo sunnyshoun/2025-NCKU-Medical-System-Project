@@ -9,8 +9,6 @@ from rpi.tester import make_test
 from rpi.resource import Audio
 from hardwares.button import Button
 
-from traceback import print_exc
-
 class TestCoordinator:
     """協調視力測試的執行，支援按鈕模式和手機模式"""
     

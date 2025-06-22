@@ -43,32 +43,17 @@ class PairingAgent(ServiceInterface):
 
     @method()
     def AuthorizeService(self, device: "o", uuid: "s"):
-        """授權服務連接"""
+        """只授權 EyeDwell 服務，拒絕所有其他服務"""
         logger.info(f"設備 {device} 請求服務 {uuid}")
         
-        # 定義音訊和通話相關的 UUID 列表，包括 aptX 相關 UUID
-        AUDIO_AND_CALL_RELATED_UUIDS = {
-            "0000111e-0000-1000-8000-00805f9b34fb",  # Hands-Free Profile (HFP)
-            "0000111f-0000-1000-8000-00805f9b34fb",  # Hands-Free Audio Gateway
-            "0000110a-0000-1000-8000-00805f9b34fb",  # Audio Source (A2DP)
-            "0000110b-0000-1000-8000-00805f9b34fb",  # Audio Sink (A2DP)
-            "0000110d-0000-1000-8000-00805f9b34fb",  # Advanced Audio Distribution Profile (A2DP)
-            "0000110e-0000-1000-8000-00805f9b34fb",  # Audio/Video Remote Control Profile (AVRCP)
-        }
+        uuid_lower = uuid.lower()
         
-        # 檢查請求的 UUID 是否為音訊或通話相關
-        if uuid.lower() in AUDIO_AND_CALL_RELATED_UUIDS:
-            logger.info(f"拒絕音訊或通話相關服務 {uuid} 的配對請求")
-            raise Exception("音訊或通話服務未授權")
-        
-        # 允許你的 EyeDwell 服務 UUID
-        if uuid.lower() == SERVICE_UUID.lower():
+        if uuid_lower == SERVICE_UUID.lower():
             logger.info(f"授權 EyeDwell 服務 {uuid}")
             return
         
-        # 如果是其他未知的 UUID，可以選擇拒絕或允許
-        logger.warning(f"未知服務 {uuid}，默認拒絕")
-        raise Exception("未知服務未授權")
+        logger.info(f"拒絕服務: {uuid}")
+        raise Exception(f"只允許 EyeDwell 服務，拒絕服務 {uuid}")
 
     @method()
     def RequestPinCode(self, device: "o") -> "s":
