@@ -1,0 +1,122 @@
+import 'dart:convert';
+import 'package:flutter/material.dart';
+import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:http/http.dart' as http;
+import 'package:eye_dwell/configs/app_localizations.dart';
+
+class TokenData {
+  final String accessToken;
+  final String refreshToken;
+
+  TokenData({required this.accessToken, required this.refreshToken});
+
+  factory TokenData.fromJson(Map<String, dynamic> json) {
+    return TokenData(
+      accessToken: json['access_token'],
+      refreshToken: json['refresh_token'],
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {'accessToken': accessToken, 'refreshToken': refreshToken};
+  }
+}
+
+class ApiResponse {
+  final String status;
+  final dynamic data;
+  final String message;
+  final int statusCode;
+
+  ApiResponse({
+    required this.data,
+    required this.message,
+    required this.status,
+    required this.statusCode,
+  });
+
+  factory ApiResponse.err() {
+    return ApiResponse(
+      data: "",
+      message: "default err message",
+      status: "error",
+      statusCode: 400,
+    );
+  }
+
+  factory ApiResponse.fromJson(Map<String, dynamic> json, int statusCode) {
+    return ApiResponse(
+      status: json['status'],
+      message: json['message'],
+      data: json['data'],
+      statusCode: statusCode,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'status': status,
+      'data': data,
+      'message': message,
+      'statusCode': statusCode,
+    };
+  }
+
+  factory ApiResponse.fromHttp(http.Response response) {
+    return ApiResponse.fromJson(jsonDecode(response.body), response.statusCode);
+  }
+
+  AlertDialog alertResponse(BuildContext context, AppLocalizations t) {
+    return AlertDialog(
+      title: Text('$status, code: $statusCode'),
+      content: Text(message),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(t.get('confirm')),
+        ),
+      ],
+    );
+  }
+
+  TokenData? asTokenData() {
+    if (data is Map<String, dynamic>) {
+      final map = data as Map<String, dynamic>;
+      if (map.containsKey('access_token') && map.containsKey('refresh_token')) {
+        return TokenData.fromJson(map);
+      }
+    }
+    return null;
+  }
+}
+
+class BleModel {
+  final List<BluetoothService> services;
+  final BluetoothDevice bluetoothDevice;
+  
+  final Guid serviceUuid = Guid("12345678-abcd-1234-5678-123456789abc");
+  final Guid commandCharUuid = Guid("12345678-abcd-1234-5678-123456789ab1");
+  final Guid dataCharUuid = Guid("12345678-abcd-1234-5678-123456789ab2");
+
+  late BluetoothCharacteristic commandChar;
+  late BluetoothCharacteristic dataChar;
+
+  BleModel({required this.services, required this.bluetoothDevice}) {
+    for (var service in services) {
+      if (service.uuid == serviceUuid) {
+        for (var char in service.characteristics) {
+          if (char.uuid == commandCharUuid) {
+            commandChar = char;
+          } else if (char.uuid == dataCharUuid) {
+            dataChar = char;
+          }
+        }
+      }
+    }
+  }
+
+  String get deviceName =>
+      bluetoothDevice.platformName.isNotEmpty
+          ? bluetoothDevice.platformName
+          : bluetoothDevice.remoteId.toString();
+}
