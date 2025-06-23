@@ -107,8 +107,18 @@ class _BluetoothPageState extends State<BluetoothPage> {
 
     if (blueStates.adapterState == BluetoothAdapterState.off) {
       return Scaffold(
-        appBar: AppBar(title: Text(t.get('connect_bluetooth'))),
-        body: Center(child: Text('藍牙未開啟')),
+        appBar: AppBar(
+          title: Text(
+            t.get('connect_bluetooth'),
+            style: TextStyle(fontSize: generalStates.fontSize),
+          ),
+        ),
+        body: Center(
+          child: Text(
+            '藍牙未開啟',
+            style: TextStyle(fontSize: generalStates.fontSize),
+          ),
+        ),
       );
     }
 
@@ -133,7 +143,12 @@ class _BluetoothPageState extends State<BluetoothPage> {
     });
 
     return Scaffold(
-      appBar: AppBar(title: Text(t.get('connect_bluetooth'))),
+      appBar: AppBar(
+        title: Text(
+          t.get('connect_bluetooth'),
+          style: TextStyle(fontSize: generalStates.fontSize + 4),
+        ),
+      ),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -153,8 +168,14 @@ class _BluetoothPageState extends State<BluetoothPage> {
                           : result.device.remoteId.toString(),
                       style: TextStyle(fontSize: generalStates.fontSize),
                     ),
-                    subtitle: Text(result.device.advName),
-                    trailing: Text('${result.rssi} dBm'),
+                    subtitle: Text(
+                      result.device.advName,
+                      style: TextStyle(fontSize: generalStates.fontSize / 2),
+                    ),
+                    trailing: Text(
+                      '${result.rssi} dBm',
+                      style: TextStyle(fontSize: generalStates.fontSize / 2),
+                    ),
                     onTap: () => _controller.connectToDevice(result.device),
                   );
                 },

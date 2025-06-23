@@ -36,7 +36,12 @@ class _SettingsPageState extends State<SettingsPage> {
     final t = AppLocalizations(states.locale);
 
     return Scaffold(
-      appBar: AppBar(title: Text(t.get('settings'))),
+      appBar: AppBar(
+        title: Text(
+          t.get('settings'),
+          style: TextStyle(fontSize: states.fontSize + 4),
+        ),
+      ),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -48,9 +53,21 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
             DropdownButton<String>(
               value: states.locale,
-              items: const [
-                DropdownMenuItem(value: 'en', child: Text('English')),
-                DropdownMenuItem(value: 'zh', child: Text('繁體中文')),
+              items: [
+                DropdownMenuItem(
+                  value: 'en',
+                  child: Text(
+                    'English',
+                    style: TextStyle(fontSize: states.fontSize),
+                  ),
+                ),
+                DropdownMenuItem(
+                  value: 'zh',
+                  child: Text(
+                    '繁體中文',
+                    style: TextStyle(fontSize: states.fontSize),
+                  ),
+                ),
               ],
               onChanged: (val) => _controller.onLocaleChanged(val),
             ),
@@ -72,7 +89,10 @@ class _SettingsPageState extends State<SettingsPage> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  label: Text(t.get('update_profile')),
+                  label: Text(
+                    t.get('update_profile'),
+                    style: TextStyle(fontSize: states.fontSize),
+                  ),
                   onPressed: () {
                     Navigator.of(context).push(
                       MaterialPageRoute(
@@ -92,7 +112,10 @@ class _SettingsPageState extends State<SettingsPage> {
               width: double.infinity,
               child: ElevatedButton.icon(
                 icon: const Icon(Icons.logout),
-                label: Text(t.get('logout')),
+                label: Text(
+                  t.get('logout'),
+                  style: TextStyle(fontSize: states.fontSize),
+                ),
                 onPressed: _controller.logout,
               ),
             ),

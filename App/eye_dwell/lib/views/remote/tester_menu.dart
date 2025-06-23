@@ -6,7 +6,7 @@ import 'package:eye_dwell/models/state_models.dart';
 
 class TesterMenuPage extends StatefulWidget {
   final GeneralStateModel generalStates;
-  final TestMenuModel menuStates;
+  final TestModel menuStates;
   final void Function() start;
 
   const TesterMenuPage({

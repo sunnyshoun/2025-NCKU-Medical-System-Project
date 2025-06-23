@@ -1,24 +1,25 @@
 import 'dart:developer';
-
+import 'package:eye_dwell/controllers/remote/remote_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:eye_dwell/configs/app_localizations.dart';
-import 'package:eye_dwell/controllers/settings_controller.dart';
-import 'package:eye_dwell/models/networks_models.dart';
 import 'package:eye_dwell/models/state_models.dart';
-import 'package:eye_dwell/models/user_models.dart';
-import 'package:eye_dwell/models/wrappers.dart';
 import 'package:eye_dwell/networks/blue.dart';
-import 'package:eye_dwell/networks/spring.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:record/record.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class ControlPage extends StatefulWidget {
-  final GeneralStateModel states;
-  final TestMenuModel menuStates;
+  final GeneralStateModel generalStates;
+  final TestModel testStates;
+  final RemoteController controller;
   final void Function() disconnect;
+
   const ControlPage({
     super.key,
-    required this.states,
+    required this.generalStates,
     required this.disconnect,
-    required this.menuStates,
+    required this.testStates,
+    required this.controller,
   });
 
   @override
@@ -26,107 +27,104 @@ class ControlPage extends StatefulWidget {
 }
 
 class _ControlPageState extends State<ControlPage> {
-  String _message = '';
-  List<String> messageKey = ['測左眼裸視', '測右眼裸視', '測左眼矯正', '測右眼矯正'];
-  bool enable = false;
+  final List<String> _messageKey = [
+    'measure_l',
+    'measure_r',
+    'measure_cl',
+    'measure_cr',
+  ];
+  final _record = AudioRecorder();
+  bool _isRecording = false;
 
-  String? l;
-  String? r;
-  String? cl;
-  String? cr;
-  int ind = 0;
+  @override
+  void initState() {
+    super.initState();
+    final testStates = widget.testStates;
+    final controller = widget.controller;
+    BLEInterface.onData = [
+      (value) {
+        log(value.toString());
+        if (value['type'] == 'ready_for_input') {
+          testStates.isRemoteEnable = true;
+        } else if (value['type'] == 'test_complete') {
+          testStates.isRemoteEnable = false;
+          controller.testResult = value['score'];
 
-  void _postRecord() async {
-    if (l == null || r == null) {
-      return;
+          if (testStates.isTestEnd) {
+            controller.postRecord(context);
+            controller.clearResult();
+          } else {
+            BLEInterface.sendCommand(widget.generalStates.blue!, {
+              'type': 'start_test',
+            });
+          }
+          setState(() {});
+        }
+      },
+    ];
+    _checkPermission();
+  }
+
+  Future<void> _checkPermission() async {
+    if (await Permission.microphone.request().isGranted) {
+      log('Microphone permission granted');
+    } else {
+      log('Microphone permission denied');
     }
+  }
 
-    final record = VisionRecord(
-      uncorrectedVisionLeft: l!,
-      uncorrectedVisionRight: r!,
-      correctedVisionLeft: cl,
-      correctedVisionRight: cr,
-      createdAt: DateTime.now().toUtc(),
-    );
-    log(record.toJson().toString());
-
-    ApiResponse response = ApiResponse.err();
-    Future<bool> innerPost() async {
-      response = await SpringAPI.postrecords(widget.states.accessToken, record);
-      return response.statusCode == 401;
-    }
-
-    if (!await Wrappers.tryRefresh(innerPost, widget.states)) {
-      // logout
-      log('refresh token invalid');
-      UpdateProfileController.clearProfile(widget.states, context);
-      return;
-    }
-
-    if (response.statusCode != 201) {
-      showDialog(
-        context: context,
-        builder:
-            (_) => response.alertResponse(
-              context,
-              AppLocalizations(widget.states.locale),
+  Future<void> _toggleRecording() async {
+    try {
+      if (_isRecording) {
+        await _record.stop();
+        log('Recording stopped');
+        setState(() {
+          _isRecording = false;
+        });
+      } else {
+        if (await Permission.microphone.isGranted) {
+          final cacheDir = await getApplicationCacheDirectory();
+          await _record.start(
+            RecordConfig(
+              numChannels: 1,
+              encoder: AudioEncoder.wav,
+              bitRate: 16000,
+              sampleRate: 44100,
             ),
-      );
+            path: '${cacheDir.path}/record.wav'
+          );
+          log('Recording started');
+          setState(() {
+            _isRecording = true;
+          });
+        } else {
+          log('Microphone permission not granted');
+          await _checkPermission();
+        }
+      }
+    } catch (e) {
+      log('Error in recording: $e');
     }
+  }
+
+  @override
+  void dispose() {
+    _record.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     log('build ControlPage');
-    final states = widget.states;
-    final t = AppLocalizations(states.locale);
-    final fontSize = states.fontSize;
-    BLEInterface.onData = [
-      (value) {
-        log(value.toString());
-        if (value['type'] == 'ready_for_input') {
-          enable = true;
-        } else if (value['type'] == 'test_complete') {
-          enable = false;
-          log(value['score']);
-          switch (ind) {
-            case 0:
-              l = value['score'];
-              break;
-            case 1:
-              r = value['score'];
-              break;
-            case 2:
-              cl = value['score'];
-              break;
-            case 3:
-              cr = value['score'];
-              break;
-          }
-          BLEInterface.sendCommand(states.blue!, {'type': 'start_test'});
-          setState(() {});
-        }
-      },
-    ];
-    if (l == null) {
-      ind = 0;
-    } else if (r == null) {
-      ind = 1;
-    } else if (cl == null && widget.menuStates.isCorrectionEnabled) {
-      ind = 2;
-    } else if (cr == null && widget.menuStates.isCorrectionEnabled) {
-      ind = 3;
-    } else {
-      _postRecord();
-      l = null;
-      r = null;
-      cl = null;
-      cr = null;
-      ind = 0;
-    }
-    _message = messageKey[ind];
+    final generalStates = widget.generalStates;
+    final testStates = widget.testStates;
+    final t = AppLocalizations(generalStates.locale);
+    final fontSize = generalStates.fontSize;
+    final message = t.get(_messageKey[testStates.ind]);
 
-    log('l: $l, r: $r, cl: $cl, cr: $cr');
+    log(
+      'l: ${testStates.l}, r: ${testStates.r}, cl: ${testStates.cl}, cr: ${testStates.cr}',
+    );
 
     return Scaffold(
       appBar: AppBar(
@@ -139,7 +137,7 @@ class _ControlPageState extends State<ControlPage> {
           Padding(
             padding: const EdgeInsets.all(12),
             child: Text(
-              _message,
+              message,
               style: TextStyle(fontSize: fontSize, color: Colors.black87),
             ),
           ),
@@ -154,12 +152,12 @@ class _ControlPageState extends State<ControlPage> {
                   _DirectionButton(
                     icon: Icons.arrow_drop_up,
                     onTap: () {
-                      if (enable) {
-                        BLEInterface.sendCommand(states.blue!, {
+                      if (testStates.isRemoteEnable) {
+                        BLEInterface.sendCommand(generalStates.blue!, {
                           'type': 'direction_response',
                           'direction': 1,
                         });
-                        enable = false;
+                        testStates.isRemoteEnable = false;
                       } else {
                         log('ignore direction_response 1');
                       }
@@ -172,12 +170,12 @@ class _ControlPageState extends State<ControlPage> {
                       _DirectionButton(
                         icon: Icons.arrow_left,
                         onTap: () {
-                          if (enable) {
-                            BLEInterface.sendCommand(states.blue!, {
+                          if (testStates.isRemoteEnable) {
+                            BLEInterface.sendCommand(generalStates.blue!, {
                               'type': 'direction_response',
                               'direction': 2,
                             });
-                            enable = false;
+                            testStates.isRemoteEnable = false;
                           } else {
                             log('ignore direction_response 2');
                           }
@@ -187,25 +185,28 @@ class _ControlPageState extends State<ControlPage> {
                       Padding(
                         padding: const EdgeInsets.all(4.0),
                         child: ElevatedButton(
-                          onPressed: () => log('record'),
+                          onPressed: _toggleRecording,
                           style: ElevatedButton.styleFrom(
                             shape: const CircleBorder(),
                             padding: const EdgeInsets.all(20),
-                            backgroundColor: Colors.blue,
+                            backgroundColor: _isRecording ? Colors.red : Colors.blue,
                           ),
-                          child: const Icon(Icons.check, color: Colors.white),
+                          child: Icon(
+                            _isRecording ? Icons.stop : Icons.mic,
+                            color: Colors.white,
+                          ),
                         ),
                       ),
                       // →
                       _DirectionButton(
                         icon: Icons.arrow_right,
                         onTap: () {
-                          if (enable) {
-                            BLEInterface.sendCommand(states.blue!, {
+                          if (testStates.isRemoteEnable) {
+                            BLEInterface.sendCommand(generalStates.blue!, {
                               'type': 'direction_response',
                               'direction': 0,
                             });
-                            enable = false;
+                            testStates.isRemoteEnable = false;
                           } else {
                             log('ignore direction_response 0');
                           }
@@ -217,12 +218,12 @@ class _ControlPageState extends State<ControlPage> {
                   _DirectionButton(
                     icon: Icons.arrow_drop_down,
                     onTap: () {
-                      if (enable) {
-                        BLEInterface.sendCommand(states.blue!, {
+                      if (testStates.isRemoteEnable) {
+                        BLEInterface.sendCommand(generalStates.blue!, {
                           'type': 'direction_response',
                           'direction': 3,
                         });
-                        enable = false;
+                        testStates.isRemoteEnable = false;
                       } else {
                         log('ignore direction_response 3');
                       }

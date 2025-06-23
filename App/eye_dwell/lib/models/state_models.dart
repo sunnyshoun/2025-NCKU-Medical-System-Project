@@ -78,8 +78,38 @@ class BlueListStateModel {
   StreamSubscription<BluetoothAdapterState>? adapterStateSubscription;
 }
 
-class TestMenuModel {
+class TestModel {
   bool isCorrectionEnabled = false;
   String? leftCorrection;
   String? rightCorrection;
+
+  String? l;
+  String? r;
+  String? cl;
+  String? cr;
+
+  int get ind =>
+      l == null
+          ? 0
+          : r == null
+          ? 1
+          : cl == null
+          ? 2
+          : 3;
+
+  bool get isTestEnd => ind >= (isCorrectionEnabled ? 4 : 2);
+
+  bool isRemoteEnable = false;
+
+  VisionRecord toRecord() {
+    return VisionRecord(
+      uncorrectedVisionLeft: l!,
+      uncorrectedVisionRight: r!,
+      correctedPowerLeft: leftCorrection,
+      correctedPowerRight: rightCorrection,
+      correctedVisionLeft: cl,
+      correctedVisionRight: cr,
+      createdAt: DateTime.now().toUtc(),
+    );
+  }
 }

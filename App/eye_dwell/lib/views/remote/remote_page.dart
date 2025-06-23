@@ -1,4 +1,5 @@
 import 'dart:developer';
+import 'package:eye_dwell/controllers/remote/remote_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:eye_dwell/models/state_models.dart';
 import 'package:eye_dwell/networks/blue.dart';
@@ -16,13 +17,18 @@ class RemotePage extends StatefulWidget {
 
 class _RemotePageState extends State<RemotePage> {
   late bool _started;
-  late TestMenuModel menuStates;
+  late TestModel testStates;
+  late RemoteController controller;
 
   @override
   void initState() {
     super.initState();
     _started = false;
-    menuStates = TestMenuModel();
+    testStates = TestModel();
+    controller = RemoteController(
+      generalStates: widget.states,
+      testStates: testStates,
+    );
   }
 
   @override
@@ -40,8 +46,9 @@ class _RemotePageState extends State<RemotePage> {
 
     return _started
         ? ControlPage(
-          states: states,
-          menuStates: menuStates,
+          generalStates: states,
+          testStates: testStates,
+          controller: controller,
           disconnect:
               () => setState(() {
                 BLEInterface.sendCommand(states.blue!, {"type": "disconnect"});
@@ -51,7 +58,7 @@ class _RemotePageState extends State<RemotePage> {
         )
         : TesterMenuPage(
           generalStates: states,
-          menuStates: menuStates,
+          menuStates: testStates,
           start:
               () => setState(() {
                 _started = true;
