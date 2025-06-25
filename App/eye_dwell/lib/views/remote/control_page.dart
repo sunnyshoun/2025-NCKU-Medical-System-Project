@@ -1,12 +1,13 @@
 import 'dart:developer';
 import 'package:eye_dwell/controllers/remote/remote_controller.dart';
+import 'package:eye_dwell/networks/stt.dart';
 import 'package:flutter/material.dart';
 import 'package:eye_dwell/configs/app_localizations.dart';
 import 'package:eye_dwell/models/state_models.dart';
 import 'package:eye_dwell/networks/blue.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:record/record.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:flutter_sound/flutter_sound.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 class ControlPage extends StatefulWidget {
   final GeneralStateModel generalStates;
@@ -33,8 +34,12 @@ class _ControlPageState extends State<ControlPage> {
     'measure_cl',
     'measure_cr',
   ];
-  final _record = AudioRecorder();
-  bool _isRecording = false;
+
+  FlutterSoundRecorder? _mRecorder = FlutterSoundRecorder();
+  bool _mRecorderIsInited = false;
+  Codec _codec = Codec.aacMP4;
+  String _mPath = 'record.mp4';
+  final theSource = AudioSource.microphone;
 
   @override
   void initState() {
@@ -62,54 +67,69 @@ class _ControlPageState extends State<ControlPage> {
         }
       },
     ];
-    _checkPermission();
+
+    openTheRecorder().then((value) {
+      setState(() {
+        _mRecorderIsInited = true;
+      });
+    });
   }
 
-  Future<void> _checkPermission() async {
-    if (await Permission.microphone.request().isGranted) {
-      log('Microphone permission granted');
-    } else {
-      log('Microphone permission denied');
-    }
-  }
-
-  Future<void> _toggleRecording() async {
-    try {
-      if (_isRecording) {
-        await _record.stop();
-        log('Recording stopped');
-        setState(() {
-          _isRecording = false;
-        });
-      } else {
-        if (await Permission.microphone.isGranted) {
-          final cacheDir = await getApplicationCacheDirectory();
-          await _record.start(
-            RecordConfig(
-              numChannels: 1,
-              encoder: AudioEncoder.wav,
-              bitRate: 16000,
-              sampleRate: 44100,
-            ),
-            path: '${cacheDir.path}/record.wav'
-          );
-          log('Recording started');
-          setState(() {
-            _isRecording = true;
-          });
-        } else {
-          log('Microphone permission not granted');
-          await _checkPermission();
-        }
+  Future<void> openTheRecorder() async {
+    if (!kIsWeb) {
+      var status = await Permission.microphone.request();
+      if (status != PermissionStatus.granted) {
+        throw RecordingPermissionException('Microphone permission not granted');
       }
-    } catch (e) {
-      log('Error in recording: $e');
     }
+    await _mRecorder!.openRecorder();
+    if (!await _mRecorder!.isEncoderSupported(_codec) && kIsWeb) {
+      _codec = Codec.opusWebM;
+      _mPath = 'record.webm';
+      if (!await _mRecorder!.isEncoderSupported(_codec) && kIsWeb) {
+        _mRecorderIsInited = true;
+        return;
+      }
+    }
+    _mRecorderIsInited = true;
+  }
+
+  void record() {
+    _mRecorder!
+        .startRecorder(toFile: _mPath, codec: _codec, audioSource: theSource)
+        .then((value) {
+          setState(() {});
+        });
+  }
+
+  void stopRecorder() async {
+    final t = AppLocalizations(widget.generalStates.locale);
+    await _mRecorder!.stopRecorder().then((value) {
+      setState(() {});
+      if (value != null) {
+        log('Recording saved to: $value');
+        final result = request(value, t.get('api_lang')).then((result) {
+          log('stt result: ${result ?? '<{silent}>'}');
+          BLEInterface.sendCommand(widget.generalStates.blue!, {
+            'type': 'stt_response',
+            'text': result,
+          });
+        });
+      }
+    });
+  }
+
+  void Function()? getRecorderFn() {
+    if (!_mRecorderIsInited) {
+      return null;
+    }
+    return _mRecorder!.isStopped ? record : stopRecorder;
   }
 
   @override
   void dispose() {
-    _record.dispose();
+    _mRecorder!.closeRecorder();
+    _mRecorder = null;
     super.dispose();
   }
 
@@ -133,7 +153,6 @@ class _ControlPageState extends State<ControlPage> {
       body: Column(
         mainAxisSize: MainAxisSize.max,
         children: [
-          // 訊息欄
           Padding(
             padding: const EdgeInsets.all(12),
             child: Text(
@@ -142,13 +161,11 @@ class _ControlPageState extends State<ControlPage> {
             ),
           ),
 
-          // 中心按鍵控制區
           Expanded(
             child: Center(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // ↑
                   _DirectionButton(
                     icon: Icons.arrow_drop_up,
                     onTap: () {
@@ -166,7 +183,6 @@ class _ControlPageState extends State<ControlPage> {
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // ←
                       _DirectionButton(
                         icon: Icons.arrow_left,
                         onTap: () {
@@ -181,23 +197,21 @@ class _ControlPageState extends State<ControlPage> {
                           }
                         },
                       ),
-                      // record
                       Padding(
                         padding: const EdgeInsets.all(4.0),
                         child: ElevatedButton(
-                          onPressed: _toggleRecording,
+                          onPressed: getRecorderFn(),
                           style: ElevatedButton.styleFrom(
                             shape: const CircleBorder(),
                             padding: const EdgeInsets.all(20),
-                            backgroundColor: _isRecording ? Colors.red : Colors.blue,
+                            backgroundColor:
+                                _mRecorder!.isRecording
+                                    ? Colors.red
+                                    : Colors.blue,
                           ),
-                          child: Icon(
-                            _isRecording ? Icons.stop : Icons.mic,
-                            color: Colors.white,
-                          ),
+                          child: Icon(Icons.mic, color: Colors.white),
                         ),
                       ),
-                      // →
                       _DirectionButton(
                         icon: Icons.arrow_right,
                         onTap: () {
@@ -214,7 +228,6 @@ class _ControlPageState extends State<ControlPage> {
                       ),
                     ],
                   ),
-                  // ↓
                   _DirectionButton(
                     icon: Icons.arrow_drop_down,
                     onTap: () {
@@ -245,7 +258,6 @@ class _ControlPageState extends State<ControlPage> {
   }
 }
 
-// 共用方向鍵元件
 class _DirectionButton extends StatelessWidget {
   final IconData icon;
   final VoidCallback onTap;

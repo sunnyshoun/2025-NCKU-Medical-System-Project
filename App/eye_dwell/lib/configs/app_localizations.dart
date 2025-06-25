@@ -63,6 +63,7 @@ class AppLocalizations {
       'wait_response': 'Waiting response...',
     },
     'zh': {
+      'api_lang': 'STT for course',
       'age_invalid':'年齡不能給你這樣搞',
       'bluetooth': '藍芽',
       'loginOrSignUp': '登入 / 註冊',
