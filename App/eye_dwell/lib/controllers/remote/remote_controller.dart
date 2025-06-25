@@ -11,8 +11,9 @@ import 'package:flutter/material.dart';
 class RemoteController {
   final TestModel testStates;
   final GeneralStateModel generalStates;
+  final void Function() onTestEnd;
 
-  RemoteController({required this.generalStates, required this.testStates});
+  RemoteController({required this.onTestEnd, required this.generalStates, required this.testStates});
 
   set testResult(String value) {
     switch (testStates.ind) {
@@ -31,13 +32,6 @@ class RemoteController {
       default:
         log('assign value to invalid index: ${testStates.ind}');
     }
-  }
-
-  void clearResult() {
-    testStates.l = null;
-    testStates.r = null;
-    testStates.cl = null;
-    testStates.cr = null;
   }
 
   Future<void> postRecord(BuildContext context) async {

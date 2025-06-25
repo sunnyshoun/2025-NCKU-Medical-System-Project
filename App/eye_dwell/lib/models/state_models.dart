@@ -112,4 +112,11 @@ class TestModel {
       createdAt: DateTime.now().toUtc(),
     );
   }
+
+  void clear() {
+    l = null;
+    r = null;
+    cl = null;
+    cr = null;
+  }
 }

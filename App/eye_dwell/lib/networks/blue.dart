@@ -10,7 +10,6 @@ class BLEInterface {
     bleStates.dataChar.lastValueStream.listen((value) {
       final jsonStr = utf8.decode(value);
       final data = jsonDecode(jsonStr);
-      log('run ${onData.toString()}');
       for (var fn in onData) {
         fn(data);
       }

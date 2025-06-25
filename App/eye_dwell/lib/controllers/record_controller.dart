@@ -27,12 +27,7 @@ class RecordController {
   List<VisionRecord> sortedFilteredRecords() {
     log('search record by \"${recordsStates.searchText}\"');
     return (recordsStates.records
-        .where(
-          (record) => record.createdAt
-              .toIso8601String()
-              .split('T')[0]
-              .contains(recordsStates.searchText),
-        )
+        .where((record) => record.time.contains(recordsStates.searchText))
         .toList()
       ..sort((a, b) => b.createdAt.compareTo(a.createdAt)));
   }

@@ -189,4 +189,7 @@ class VisionRecord {
       return VisionRecord.fromJson(cleanedJson);
     }).toList();
   }
+
+  String get time =>
+      '${createdAt.toLocal().toIso8601String().split('T')[0]} ${createdAt.toLocal().toIso8601String().split('T')[1].split('.')[0]}';
 }

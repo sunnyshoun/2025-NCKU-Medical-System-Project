@@ -55,9 +55,10 @@ class _ControlPageState extends State<ControlPage> {
           testStates.isRemoteEnable = false;
           controller.testResult = value['score'];
 
+          log('ind: ${testStates.ind}, isTestEnd: ${testStates.isTestEnd}');
           if (testStates.isTestEnd) {
             controller.postRecord(context);
-            controller.clearResult();
+            controller.onTestEnd();
           } else {
             BLEInterface.sendCommand(widget.generalStates.blue!, {
               'type': 'start_test',
@@ -108,7 +109,7 @@ class _ControlPageState extends State<ControlPage> {
       setState(() {});
       if (value != null) {
         log('Recording saved to: $value');
-        final result = request(value, t.get('api_lang')).then((result) {
+        request(value, t.get('api_lang')).then((result) {
           log('stt result: ${result ?? '<{silent}>'}');
           BLEInterface.sendCommand(widget.generalStates.blue!, {
             'type': 'stt_response',
@@ -143,7 +144,7 @@ class _ControlPageState extends State<ControlPage> {
     final message = t.get(_messageKey[testStates.ind]);
 
     log(
-      'l: ${testStates.l}, r: ${testStates.r}, cl: ${testStates.cl}, cr: ${testStates.cr}',
+      'l: ${testStates.l}, r: ${testStates.r}, cl: ${testStates.cl}, cr: ${testStates.cr} ',
     );
 
     return Scaffold(

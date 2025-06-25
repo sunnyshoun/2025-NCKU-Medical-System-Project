@@ -9,6 +9,7 @@ import 'package:eye_dwell/views/remote/tester_menu.dart';
 
 class RemotePage extends StatefulWidget {
   final GeneralStateModel states;
+
   const RemotePage({super.key, required this.states});
 
   @override
@@ -28,6 +29,11 @@ class _RemotePageState extends State<RemotePage> {
     controller = RemoteController(
       generalStates: widget.states,
       testStates: testStates,
+      onTestEnd:
+          () => setState(() {
+            _started = false;
+            testStates.clear();
+          }),
     );
   }
 
@@ -61,6 +67,7 @@ class _RemotePageState extends State<RemotePage> {
           menuStates: testStates,
           start:
               () => setState(() {
+                testStates.clear();
                 _started = true;
                 BLEInterface.sendCommand(states.blue!, {'type': 'start_test'});
               }),

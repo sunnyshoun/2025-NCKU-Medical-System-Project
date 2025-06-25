@@ -204,7 +204,6 @@ class _BluetoothPageState extends State<BluetoothPage> {
 
   @override
   void dispose() {
-    log('dispose');
     _controller.stopScan();
     _controller.blueStates.adapterStateSubscription?.cancel();
     _controller.onListChanged
