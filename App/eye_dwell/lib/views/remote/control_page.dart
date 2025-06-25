@@ -107,7 +107,7 @@ class _ControlPageState extends State<ControlPage> {
     final t = AppLocalizations(widget.generalStates.locale);
     await _mRecorder!.stopRecorder().then((value) {
       setState(() {});
-      if (value != null) {
+      if (value != null && widget.testStates.isRemoteEnable) {
         log('Recording saved to: $value');
         request(value, t.get('api_lang')).then((result) {
           log('stt result: ${result ?? '<{silent}>'}');

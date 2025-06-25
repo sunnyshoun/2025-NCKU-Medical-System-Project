@@ -55,6 +55,20 @@ class _SettingsPageState extends State<SettingsPage> {
               value: states.locale,
               items: [
                 DropdownMenuItem(
+                  value: 'zh',
+                  child: Text(
+                    '繁體中文',
+                    style: TextStyle(fontSize: states.fontSize),
+                  ),
+                ),
+                DropdownMenuItem(
+                  value: 'tw',
+                  child: Text(
+                    '台語',
+                    style: TextStyle(fontSize: states.fontSize),
+                  ),
+                ),
+                DropdownMenuItem(
                   value: 'en',
                   child: Text(
                     'English',
@@ -62,9 +76,9 @@ class _SettingsPageState extends State<SettingsPage> {
                   ),
                 ),
                 DropdownMenuItem(
-                  value: 'zh',
+                  value: 'ja',
                   child: Text(
-                    '繁體中文',
+                    '日本語',
                     style: TextStyle(fontSize: states.fontSize),
                   ),
                 ),
