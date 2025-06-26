@@ -4,6 +4,7 @@ import org.hibernate.validator.constraints.Range;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
@@ -22,7 +23,7 @@ public class RegisterRequest {
     private String email;
 
     @Range(min = 1, max = 110, message = "Age must be between 1 and 110")
-    @NotBlank(message = "Age cannot be empty")
+    @NotNull(message = "Age cannot be null")
     private Integer age;
     
     private String gender;

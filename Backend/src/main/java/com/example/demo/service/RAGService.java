@@ -260,7 +260,7 @@ public class RAGService {
         // 添加用戶病歷記錄
         if (!userRecords.isEmpty()) {
             systemMessage.append("\n## 用戶視力檢查記錄\n");
-            for (int i = 0; i < Math.min(userRecords.size(), 3); i++) { // 最多顯示最近3次記錄
+            for (int i = userRecords.size()-1; i >= 0; i--) { // 最多顯示最近5次記錄
                 Record record = userRecords.get(i);
                 systemMessage.append(String.format("### 記錄 %d (%s)\n", i + 1, 
                         record.getCreatedAt().toLocalDate().toString()));
