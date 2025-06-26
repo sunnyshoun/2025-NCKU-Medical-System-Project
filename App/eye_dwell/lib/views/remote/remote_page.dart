@@ -1,4 +1,5 @@
 import 'dart:developer';
+import 'package:eye_dwell/controllers/player.dart';
 import 'package:eye_dwell/controllers/remote/remote_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:eye_dwell/models/state_models.dart';
@@ -70,7 +71,17 @@ class _RemotePageState extends State<RemotePage> {
                 testStates.clear();
                 _started = true;
                 BLEInterface.sendCommand(states.blue!, {'type': 'start_test'});
+                Player.playAudioFromAssets(
+                  context,
+                  'assets/test_intro_${states.locale}.wav',
+                );
               }),
         );
+  }
+
+  @override
+  void dispose() {
+    Player.dispose();
+    super.dispose();
   }
 }

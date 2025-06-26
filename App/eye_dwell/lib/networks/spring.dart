@@ -6,7 +6,7 @@ import 'package:eye_dwell/models/networks_models.dart';
 import 'package:eye_dwell/models/user_models.dart';
 
 class SpringAPI {
-  static String BASE_DOMAIN = '192.168.209.32:8080';
+  static String BASE_DOMAIN = '192.168.209.24:8080';
   static var client = http.Client();
 
   static Future<ApiResponse> register(RegistrationModel request) async {

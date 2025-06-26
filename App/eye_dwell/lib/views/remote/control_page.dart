@@ -1,4 +1,5 @@
 import 'dart:developer';
+import 'package:eye_dwell/controllers/player.dart';
 import 'package:eye_dwell/controllers/remote/remote_controller.dart';
 import 'package:eye_dwell/networks/stt.dart';
 import 'package:flutter/material.dart';
@@ -51,6 +52,7 @@ class _ControlPageState extends State<ControlPage> {
         log(value.toString());
         if (value['type'] == 'ready_for_input') {
           testStates.isRemoteEnable = true;
+          Player.playAudioFromAssets(context, 'assets/beep.wav');
         } else if (value['type'] == 'test_complete') {
           testStates.isRemoteEnable = false;
           controller.testResult = value['score'];
