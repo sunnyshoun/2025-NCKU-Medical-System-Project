@@ -5,8 +5,7 @@ class AppLocalizations {
 
   static const _localizedValues = {
     'en': {
-      // TODO: specify api_lang
-      'api_lang': 'STT for course',
+      'api_lang': 'English',
       'age_invalid':'Age is not valid',
       'bluetooth': 'Blutooth',
       'loginOrSignUp': 'Login / Sign up',
@@ -124,8 +123,8 @@ class AppLocalizations {
       'wait_response': '正在輸入...',
     },
     'tw': {
-      // TODO: specify api_lang
-      'api_lang': 'STT for course',
+      // TODO: this is not valid api_lang
+      'api_lang': 'TA Phoneme',
       'age_invalid':'年齡不能給你這樣搞',
       'bluetooth': '藍芽',
       'loginOrSignUp': '登入 / 註冊',
@@ -184,8 +183,7 @@ class AppLocalizations {
       'wait_response': '正在輸入...',
     },
     'ja': {
-      // TODO: specify api_lang
-      'api_lang': 'STT for course',
+      'api_lang': 'Japanese',
       'age_invalid': '年齢が無効です',
       'bluetooth': 'Bluetooth',
       'loginOrSignUp': 'ログイン / 新規登録',
